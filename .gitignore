@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data (Ignore everything except documentation)
+data/*
+!data/.gitignore
+!data/dataset_info.md
+
+# Results (Keep plots and JSON metrics)
+results/*
+!results/*.png
+!results/*.jpg
+!results/*.json
+!results/.gitignore
+
+# Weights and Models (Ignore large binary files)
+*.pt
+*.pth
+*.bin
+models/
+checkpoint-*/
