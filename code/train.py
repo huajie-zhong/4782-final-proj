@@ -60,8 +60,9 @@ def train(args):
         num_training_steps=total_steps
     )
 
-    # Lambda weights (0.8^k) as per user's feedback correction
-    lambda_weights = [0.8**k for k in range(model.num_heads)]
+    # Lambda weights: λ_k = 0.8^k with k starting at 1 (paper §2.2.1, 1-indexed sum).
+    # K=4 heads → [0.8, 0.64, 0.512, 0.4096].
+    lambda_weights = [0.8**(k + 1) for k in range(model.num_heads)]
     print(f"Loss weights per head: {lambda_weights}")
 
     # 4. Training Loop
@@ -175,7 +176,8 @@ def train(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Medusa Heads")
     parser.add_argument("--model_name", type=str, default="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-    parser.add_argument("--max_samples", type=int, default=1000, help="Number of ShareGPT samples to use")
+    # 1000 = smoke-test default; paper uses ~60k. Pass --max_samples 60000 for the full run.
+    parser.add_argument("--max_samples", type=int, default=1000, help="Number of ShareGPT samples to use (1000=smoke test, 60000=paper-scale)")
     parser.add_argument("--max_length", type=int, default=2048, help="Max sequence length")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size per GPU")
     parser.add_argument("--grad_accum_steps", type=int, default=8, help="Gradient accumulation steps")
