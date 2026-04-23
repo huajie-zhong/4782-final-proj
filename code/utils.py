@@ -2,40 +2,51 @@
 utils.py
 
 Contains core logic for Medusa tree attention, including tree construction,
-mask generation, and position ID generation.
+mask generation, position ID generation, and acceptance criteria.
 """
 
 import torch
+import torch.nn.functional as F
 
 # Static 64-node tree topology based on typical top-k probabilities (s=[10, 3, 2, 2])
 MEDUSA_TREE_NODES = [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,), (0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (3, 0), (3, 1), (4, 0), (5, 0), (6, 0), (7, 0), (0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1), (0, 2, 0), (0, 2, 1), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1), (1, 2, 0), (2, 0, 0), (2, 0, 1), (2, 1, 0), (3, 0, 0), (3, 0, 1), (4, 0, 0), (5, 0, 0), (6, 0, 0), (0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 0), (0, 0, 1, 1), (0, 1, 0, 0), (0, 1, 0, 1), (0, 1, 1, 0), (0, 2, 0, 0), (0, 2, 0, 1), (0, 2, 1, 0), (1, 0, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 1, 0, 0), (1, 2, 0, 0), (2, 0, 0, 0), (2, 0, 0, 1), (2, 0, 1, 0), (2, 1, 0, 0), (3, 0, 0, 0), (4, 0, 0, 0), (5, 0, 0, 0), (6, 0, 0, 0)]
 MEDUSA_TREE_PARENT_INDICES = [-1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 14, 14, 15, 16, 16, 18, 19, 20, 22, 22, 23, 23, 24, 24, 25, 26, 26, 27, 28, 28, 29, 30, 32, 33, 33, 34, 35, 36, 38, 39, 40]
 
-def build_candidate_tree(top_tokens_per_head):
+def build_candidate_tree(top_tokens_per_head, tree_budget=64):
     """
     Builds candidate tree using the static tree topology.
     Args:
-        top_tokens_per_head: List of 4 tensors of shape (batch, s_k). 
+        top_tokens_per_head: List of 4 tensors of shape (batch, s_k).
                              We assume batch=1 for single sequence inference.
+        tree_budget: Number of tree nodes to use (32 or 64). Truncates the
+                     static node list; all parents of included nodes remain valid
+                     because nodes are ordered BFS (parents always precede children).
     Returns:
-        tree_tokens: tensor of shape (tree_size,) containing token IDs.
-        tree_parent_indices: tensor of shape (tree_size,) containing parent pointers.
+        tree_tokens: tensor of shape (tree_budget,) containing token IDs.
+        tree_parent_indices: tensor of shape (tree_budget,) containing parent pointers.
     """
-    # Assuming single sequence generation (batch size 1)
     if top_tokens_per_head[0].dim() > 1:
         top_tokens_per_head = [x[0] for x in top_tokens_per_head]
-        
+
+    nodes = MEDUSA_TREE_NODES[:tree_budget]
+    parents = MEDUSA_TREE_PARENT_INDICES[:tree_budget]
+
     tree_tokens = []
-    for node in MEDUSA_TREE_NODES:
+    for node in nodes:
         head_idx = len(node) - 1
         token_rank = node[-1]
         token_id = top_tokens_per_head[head_idx][token_rank].item()
         tree_tokens.append(token_id)
-        
-    return torch.tensor(tree_tokens), torch.tensor(MEDUSA_TREE_PARENT_INDICES)
+
+    return torch.tensor(tree_tokens), torch.tensor(parents)
 
 def generate_tree_mask(tree_parent_indices, prefix_len):
-    """Generates attention mask for tree candidates."""
+    """Generates attention mask for tree candidates.
+
+    `prefix_len` is the number of tokens already committed to the sequence,
+    including the most recently sampled LM-head token from the prior step
+    (standard MEDUSA reference-repo convention).
+    """
     tree_size = len(tree_parent_indices)
     mask = torch.zeros((tree_size, prefix_len + tree_size), dtype=torch.bool)
     
@@ -52,7 +63,13 @@ def generate_tree_mask(tree_parent_indices, prefix_len):
     return mask
 
 def generate_position_ids(tree_parent_indices, prefix_len):
-    """Generates position IDs for tree candidates."""
+    """Generates position IDs for tree candidates.
+
+    `prefix_len` must equal the number of tokens already committed to the
+    sequence, **including** the most recently sampled LM-head token from the
+    prior step. Depth-1 tree nodes (Medusa head 1, predicting t+2) then land
+    at position `prefix_len`, depth-2 at `prefix_len + 1`, etc.
+    """
     tree_size = len(tree_parent_indices)
     positions = torch.zeros(tree_size, dtype=torch.long)
     
@@ -68,6 +85,109 @@ def generate_position_ids(tree_parent_indices, prefix_len):
         positions[i] = prefix_len + depth - 1
         
     return positions
+
+def greedy_accept(prop_logits_1d, verify_logits_2d, tree_tokens, tree_parent_indices):
+    """
+    Greedy acceptance: accept node i if parent's argmax prediction == tree_tokens[i].
+
+    Args:
+        prop_logits_1d: (vocab_size,) logits from the proposal pass at lm_token position.
+                        Predicts the token after lm_token; used to check depth-1 (root) nodes.
+        verify_logits_2d: (tree_size, vocab_size) logits from the verify pass.
+                          verify_logits_2d[i] predicts what comes after tree node i;
+                          used to check i's children.
+        tree_tokens: (tree_size,) token IDs at each tree node.
+        tree_parent_indices: (tree_size,) parent pointer for each node (-1 = root).
+
+    Returns:
+        accepted_path: list of node indices (in tree order) along the longest
+                       accepted root-to-leaf path.  Empty list if no root accepted.
+    """
+    parents = tree_parent_indices.tolist() if isinstance(tree_parent_indices, torch.Tensor) else list(tree_parent_indices)
+    tokens = tree_tokens.tolist() if isinstance(tree_tokens, torch.Tensor) else list(tree_tokens)
+
+    children = {i: [] for i in range(len(parents))}
+    roots = []
+    for i, p in enumerate(parents):
+        if p == -1:
+            roots.append(i)
+        else:
+            children[p].append(i)
+
+    pred_after_lm = prop_logits_1d.argmax().item()
+
+    best_path = []
+    for root in roots:
+        if pred_after_lm != tokens[root]:
+            continue
+        path = [root]
+        curr = root
+        while children[curr]:
+            pred = verify_logits_2d[curr].argmax().item()
+            extended = False
+            for child in children[curr]:
+                if pred == tokens[child]:
+                    path.append(child)
+                    curr = child
+                    extended = True
+                    break
+            if not extended:
+                break
+        if len(path) > len(best_path):
+            best_path = path
+    return best_path
+
+
+def typical_accept(prop_logits_1d, verify_logits_2d, tree_tokens, tree_parent_indices,
+                   epsilon=0.09, delta=0.09):
+    """
+    Typical acceptance (paper §2.3.1): accept node i if
+        p_model(tree_tokens[i]) > min(ε, δ · exp(-H(p_model)))
+    where p_model is the softmax distribution at i's parent position and H is its entropy.
+
+    Args same as greedy_accept, plus:
+        epsilon, delta: thresholds from the paper (both default 0.09).
+
+    Returns:
+        accepted_path: same format as greedy_accept.
+    """
+    parents = tree_parent_indices.tolist() if isinstance(tree_parent_indices, torch.Tensor) else list(tree_parent_indices)
+    tokens = tree_tokens.tolist() if isinstance(tree_tokens, torch.Tensor) else list(tree_tokens)
+
+    children = {i: [] for i in range(len(parents))}
+    roots = []
+    for i, p in enumerate(parents):
+        if p == -1:
+            roots.append(i)
+        else:
+            children[p].append(i)
+
+    def _check(logits_1d, token_id):
+        p = F.softmax(logits_1d.float(), dim=-1)
+        H = -(p * (p + 1e-10).log()).sum()
+        tau = min(epsilon, delta * float((-H).exp()))
+        return p[token_id].item() > tau
+
+    best_path = []
+    for root in roots:
+        if not _check(prop_logits_1d, tokens[root]):
+            continue
+        path = [root]
+        curr = root
+        while children[curr]:
+            extended = False
+            for child in children[curr]:
+                if _check(verify_logits_2d[curr], tokens[child]):
+                    path.append(child)
+                    curr = child
+                    extended = True
+                    break
+            if not extended:
+                break
+        if len(path) > len(best_path):
+            best_path = path
+    return best_path
+
 
 if __name__ == "__main__":
     print("Testing Utils...")
