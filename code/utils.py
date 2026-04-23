@@ -40,6 +40,60 @@ def build_candidate_tree(top_tokens_per_head, tree_budget=64):
 
     return torch.tensor(tree_tokens), torch.tensor(parents)
 
+def build_linear_tree(top_tokens_per_head):
+    """Heads-only ablation (Table 3, Row 1): take each head's top-1 token and
+    arrange them as a linear chain of K nodes.
+
+    This reproduces paper Table 3 Row 1 — "MEDUSA head, no tree attention" —
+    because the resulting tree degenerates into a single root-to-leaf path:
+    each node has exactly one parent (the previous depth) and at most one
+    child. Verification still uses the tree mask/position machinery, but with
+    only K=4 candidates and no branching, it is equivalent to linear
+    speculative decoding.
+    """
+    if top_tokens_per_head[0].dim() > 1:
+        top_tokens_per_head = [x[0] for x in top_tokens_per_head]
+    tree_tokens = [top_tokens_per_head[k][0].item() for k in range(len(top_tokens_per_head))]
+    parents = [k - 1 for k in range(len(top_tokens_per_head))]  # -1, 0, 1, 2
+    return torch.tensor(tree_tokens), torch.tensor(parents)
+
+
+def build_naive_tree(top_tokens_per_head, s_k=(10, 3, 2, 2)):
+    """Full Cartesian-product tree (Table 3, Row 2): every depth-k-1 parent
+    gets s_k children, with no pruning. Total size = 10 + 30 + 60 + 120 = 220.
+    """
+    if top_tokens_per_head[0].dim() > 1:
+        top_tokens_per_head = [x[0] for x in top_tokens_per_head]
+
+    nodes = []
+    parents = []
+
+    # Depth 1 — roots from head 0
+    for i in range(s_k[0]):
+        nodes.append((i,))
+        parents.append(-1)
+
+    prev_start = 0
+    prev_count = s_k[0]
+    for depth in range(1, len(s_k)):
+        new_start = len(nodes)
+        for parent_idx in range(prev_start, prev_start + prev_count):
+            parent_path = nodes[parent_idx]
+            for j in range(s_k[depth]):
+                nodes.append(parent_path + (j,))
+                parents.append(parent_idx)
+        prev_start = new_start
+        prev_count = prev_count * s_k[depth]
+
+    tree_tokens = []
+    for node in nodes:
+        head_idx = len(node) - 1
+        token_rank = node[-1]
+        tree_tokens.append(top_tokens_per_head[head_idx][token_rank].item())
+
+    return torch.tensor(tree_tokens), torch.tensor(parents)
+
+
 def generate_tree_mask(tree_parent_indices, prefix_len):
     """Generates attention mask for tree candidates.
 
@@ -237,3 +291,21 @@ if __name__ == "__main__":
     assert pos[63].item() == 13, f"Expected pos 13 for node 63, got {pos[63].item()}"
     
     print("64-node tree tests passed!")
+
+    # Test linear chain (Table 3 Row 1)
+    print("Testing linear chain tree (heads-only ablation)...")
+    tree_tokens_lin, parents_lin = build_linear_tree(top_tokens)
+    assert tree_tokens_lin.shape == (4,), f"Expected 4 tokens, got {tree_tokens_lin.shape}"
+    assert parents_lin.tolist() == [-1, 0, 1, 2], f"Expected linear parents, got {parents_lin.tolist()}"
+    assert tree_tokens_lin.tolist() == [10, 20, 30, 40], f"Linear chain should pick top-1 per head"
+    print("Linear chain tests passed!")
+
+    # Test naive full Cartesian (Table 3 Row 2)
+    print("Testing naive full Cartesian tree...")
+    tree_tokens_naive, parents_naive = build_naive_tree(top_tokens)
+    assert tree_tokens_naive.shape == (220,), f"Expected 220 tokens, got {tree_tokens_naive.shape}"
+    # Depth-1 roots: 10 nodes, all parents = -1
+    assert (parents_naive[:10] == -1).all(), "First 10 nodes should be roots"
+    # Depth-2: 30 nodes, each parent in [0..9]
+    assert parents_naive[10:40].min().item() == 0 and parents_naive[10:40].max().item() == 9
+    print("Naive Cartesian tests passed!")
