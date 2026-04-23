@@ -10,7 +10,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 sys.path.insert(0, os.path.dirname(__file__))
 from model import MedusaModel
 from utils import (
-    build_candidate_tree, generate_tree_mask, generate_position_ids,
+    build_candidate_tree, build_linear_tree, build_naive_tree,
+    generate_tree_mask, generate_position_ids,
     greedy_accept, typical_accept,
 )
 
@@ -128,8 +129,17 @@ def greedy_baseline(model, tokenizer, prompts, max_new_tokens):
 
 # ----- Medusa decode ------------------------------------------------------
 
+def _build_tree_for_mode(top_per_head, tree_mode, tree_budget):
+    """Dispatch to the right tree builder for each Table 3 ablation mode."""
+    if tree_mode == "none":
+        return build_linear_tree(top_per_head)
+    if tree_mode == "naive":
+        return build_naive_tree(top_per_head)
+    return build_candidate_tree(top_per_head, tree_budget=tree_budget)
+
+
 def medusa_decode(model, tokenizer, prompt, max_new_tokens,
-                  acceptance="greedy", tree_budget=64):
+                  acceptance="greedy", tree_budget=64, tree_mode="optimized"):
     """MEDUSA propose → tree → verify → accept loop with explicit KV surgery.
 
     Returns (generated_text, avg_extra_accepted_per_step, tps).
@@ -167,8 +177,8 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
                 prop_head_logits[k][0, 0, :].topk(S_K[k]).indices.unsqueeze(0)
                 for k in range(len(S_K))
             ]
-            tree_tokens, tree_parent_indices = build_candidate_tree(
-                top_per_head, tree_budget=tree_budget,
+            tree_tokens, tree_parent_indices = _build_tree_for_mode(
+                top_per_head, tree_mode, tree_budget,
             )
 
             # Verify pass: all candidates in one forward with custom mask + positions
@@ -229,13 +239,14 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
 
 # ----- Aggregation --------------------------------------------------------
 
-def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budget):
+def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budget,
+               tree_mode="optimized"):
     """Run medusa_decode on each prompt and return a per-prompt result list."""
     results = []
     for prompt in prompts:
         text, acc_rate, tps = medusa_decode(
             model, tokenizer, prompt, max_new_tokens,
-            acceptance=acceptance, tree_budget=tree_budget,
+            acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
         )
         snippet = text[len(prompt):len(prompt) + 80].replace("\n", " ")
         print(f"  [{prompt[:30]}...] acc={acc_rate:.2f} tps={tps:.1f} | {snippet}")
@@ -259,6 +270,53 @@ def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64):
             "avg_acceptance_rate": avg_acc, "avg_tps": avg_tps, "results": results,
         }
     return out
+
+
+def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
+                        output_dir, model_id, acceptance="greedy"):
+    """Table 3 ablation (paper §3.2): measures speedup for three tree modes
+    sharing one greedy baseline. Saves `table3_<model_short>.json`.
+
+    Rows (relative to greedy):
+      - none:      heads-only, linear chain (paper Row 1, ~1.5x target)
+      - naive:     full 220-node Cartesian product (paper Row 2, ~1.9x target)
+      - optimized: 64-node pruned tree (paper Row 3, ~2.2x target)
+    """
+    print("\n--- Greedy baseline (shared across ablation rows) ---")
+    greedy_results = greedy_baseline(medusa_model.backbone, tokenizer, prompts, max_new_tokens)
+    greedy_tps = _avg(greedy_results, "tps")
+    print(f"Avg greedy TPS: {greedy_tps:.2f}")
+
+    rows = {}
+    for mode in ("none", "naive", "optimized"):
+        print(f"\n--- Medusa tree={mode} ---")
+        results = run_medusa(
+            medusa_model, tokenizer, prompts, max_new_tokens,
+            acceptance=acceptance, tree_budget=64, tree_mode=mode,
+        )
+        medusa_tps = _avg(results, "tps")
+        avg_acc = _avg(results, "acceptance_rate")
+        speedup = medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
+        print(f"  => tps={medusa_tps:.2f}  speedup={speedup:.2f}x  acc_rate={avg_acc:.3f}")
+        rows[mode] = {
+            "medusa_tps": medusa_tps,
+            "speedup": speedup,
+            "avg_acceptance_rate": avg_acc,
+            "results": results,
+        }
+
+    short = model_id.split("/")[-1]
+    out_file = os.path.join(output_dir, f"table3_{short}.json")
+    with open(out_file, "w") as f:
+        json.dump({
+            "model": model_id,
+            "acceptance": acceptance,
+            "greedy_tps": greedy_tps,
+            "greedy_results": greedy_results,
+            "rows": rows,
+        }, f, indent=4)
+    print(f"\nTable 3 ablation saved to {out_file}")
+    return {"greedy_tps": greedy_tps, "rows": rows}
 
 
 def compute_head_accuracy(model, tokenizer, prompts, max_length=512):
@@ -329,17 +387,39 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
 
 # ----- Model loading ------------------------------------------------------
 
-def load_backbone(model_id, device):
-    backbone = AutoModelForCausalLM.from_pretrained(
-        model_id, torch_dtype=torch.float16, attn_implementation="eager",
-    ).to(device)
+def load_backbone(model_id, device, quantize=False):
+    if quantize:
+        from transformers import BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+        backbone = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            quantization_config=bnb_config,
+            attn_implementation="eager",
+            device_map={"": device},
+        )
+    else:
+        backbone = AutoModelForCausalLM.from_pretrained(
+            model_id, torch_dtype=torch.float16, attn_implementation="eager",
+        ).to(device)
     backbone.eval()
     return backbone
 
 
 def load_medusa(backbone, device, checkpoint_path):
     """Wrap backbone with Medusa heads and load checkpoint if present."""
-    medusa_model = MedusaModel(backbone, num_heads=4).to(device)
+    medusa_model = MedusaModel(backbone, num_heads=4)
+    # If the backbone was loaded in 4-bit, bitsandbytes forbids .to() on it.
+    # Detect via getattr and only move the heads in that case.
+    is_quantized = getattr(backbone, "is_quantized", False) or getattr(backbone, "is_loaded_in_4bit", False)
+    if is_quantized:
+        medusa_model.heads.to(device)
+    else:
+        medusa_model.to(device)
     if os.path.exists(checkpoint_path):
         state_dict = torch.load(checkpoint_path, map_location=device)
         medusa_model.heads.load_state_dict(state_dict)
@@ -354,13 +434,19 @@ def load_medusa(backbone, device, checkpoint_path):
 
 def main():
     parser = argparse.ArgumentParser(description="MEDUSA Benchmark")
-    parser.add_argument("--mode", choices=["greedy", "medusa", "both", "full"], default="both",
+    parser.add_argument("--mode", choices=["greedy", "medusa", "both", "full", "table3"],
+                        default="both",
                         help="greedy|medusa|both: individual runs; "
-                             "full: greedy+medusa+head-accuracy in one pass")
+                             "full: greedy+medusa+head-accuracy in one pass; "
+                             "table3: Table 3 ablation across tree modes")
     parser.add_argument("--acceptance", choices=["greedy", "typical"], default="greedy",
                         help="Acceptance criterion for Medusa decoding")
+    parser.add_argument("--tree", choices=["optimized", "naive", "none"], default="optimized",
+                        help="Tree topology: optimized (64-node pruned), naive "
+                             "(220-node full Cartesian), none (linear heads-only chain). "
+                             "Covers Table 3 Row 3 / Row 2 / Row 1 respectively.")
     parser.add_argument("--tree_budget", type=int, choices=[32, 64], default=64,
-                        help="Number of candidate tree nodes (32 or 64)")
+                        help="Optimized-tree node budget (32 or 64). Ignored for --tree naive/none.")
     parser.add_argument("--checkpoint", type=str, default=None,
                         help="Path to medusa_heads.pt; defaults to results/medusa_heads.pt")
     parser.add_argument("--model_id", type=str,
@@ -368,6 +454,8 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=128)
     parser.add_argument("--compare", action="store_true",
                         help="With --mode medusa: run greedy vs typical and save comparison")
+    parser.add_argument("--quantize", action="store_true",
+                        help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -382,7 +470,7 @@ def main():
     ckpt_path = args.checkpoint or os.path.join(output_dir, "medusa_heads.pt")
 
     prompts = DEFAULT_PROMPTS
-    backbone = load_backbone(args.model_id, device)
+    backbone = load_backbone(args.model_id, device, quantize=args.quantize)
 
     if args.mode == "full":
         print(f"\n=== Full Benchmark — {args.model_id} ===")
@@ -390,6 +478,15 @@ def main():
         run_full_benchmark(
             medusa_model, tokenizer, prompts,
             args.max_new_tokens, output_dir, model_id=args.model_id,
+        )
+        return
+
+    if args.mode == "table3":
+        print(f"\n=== Table 3 Ablation — {args.model_id} ===")
+        medusa_model = load_medusa(backbone, device, ckpt_path)
+        run_table3_ablation(
+            medusa_model, tokenizer, prompts, args.max_new_tokens,
+            output_dir, model_id=args.model_id, acceptance=args.acceptance,
         )
         return
 
@@ -411,15 +508,16 @@ def main():
                 tree_budget=args.tree_budget,
             )
             comparison["selected_tree_budget"] = args.tree_budget
+            comparison["tree_mode"] = args.tree
             comparison["model_id"] = args.model_id
-            out_file = os.path.join(output_dir, "sprint8_comparison.json")
+            out_file = os.path.join(output_dir, "comparison.json")
             with open(out_file, "w") as f:
                 json.dump(comparison, f, indent=4)
             print(f"\nComparison saved to {out_file}")
         else:
             results = run_medusa(
                 medusa_model, tokenizer, prompts, args.max_new_tokens,
-                args.acceptance, args.tree_budget,
+                args.acceptance, args.tree_budget, tree_mode=args.tree,
             )
             avg_tps = _avg(results, "tps")
             avg_acc = _avg(results, "acceptance_rate")
@@ -431,6 +529,7 @@ def main():
                     "average_tps": avg_tps,
                     "average_acceptance_rate": avg_acc,
                     "acceptance_mode": args.acceptance,
+                    "tree_mode": args.tree,
                     "tree_budget": args.tree_budget,
                     "results": results,
                 }, f, indent=4)
