@@ -139,10 +139,173 @@ def _build_tree_for_mode(top_per_head, tree_mode, tree_budget):
 
 
 def medusa_decode(model, tokenizer, prompt, max_new_tokens,
-                  acceptance="greedy", tree_budget=64, tree_mode="optimized"):
+                  acceptance="greedy", tree_budget=64, tree_mode="optimized",
+                  design="paper"):
     """MEDUSA propose → tree → verify → accept loop with explicit KV surgery.
 
+    Two propose/verify structures are supported; both use all K trained heads
+    at tree depths 1..K:
+
+      design="paper" (default, paper-faithful, §2.3 / Figure 6):
+        Head predictions are read from the hidden state of the last committed
+        token (prefill's last position, then verify's last-accepted position).
+        One forward per step (verify only), which also advances lm_token
+        into the KV cache.
+
+      design="extra_forward" (stretch-goal alternative):
+        Separate proposal forward on lm_token alone gives head logits used
+        to build the tree. The base-LM argmax from that proposal is
+        committed as an unconditional bonus token (lm_token_2), and the
+        verify pass forwards [lm_token_2, tree_tokens]. Two forwards per
+        step; guaranteed ≥2 new tokens per step before tree acceptance.
+
     Returns (generated_text, avg_extra_accepted_per_step, tps).
+    """
+    if design == "paper":
+        return _medusa_decode_paper(
+            model, tokenizer, prompt, max_new_tokens,
+            acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
+        )
+    if design == "extra_forward":
+        return _medusa_decode_extra_forward(
+            model, tokenizer, prompt, max_new_tokens,
+            acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
+        )
+    raise ValueError(f"Unknown design={design!r}; expected 'paper' or 'extra_forward'")
+
+
+def _medusa_decode_paper(model, tokenizer, prompt, max_new_tokens,
+                         acceptance="greedy", tree_budget=64, tree_mode="optimized"):
+    """Paper-faithful Medusa decode. One forward per step; all K heads used.
+
+    Invariant at the top of each iteration:
+        `past_kv` holds positions [0..prefix_len-1]. `lm_token` is committed
+        (appended to `generated`) but not yet in `past_kv`. `head_preds[k]` are
+        head k's logits from the hidden state at position prefix_len-1, i.e.
+        they predict position prefix_len + k + 1 — which is tree depth k+1.
+    """
+    device = next(model.parameters()).device
+    dtype = next(model.parameters()).dtype
+    eos_id = tokenizer.eos_token_id
+    accept_fn = typical_accept if acceptance == "typical" else greedy_accept
+
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+    prompt_ids = input_ids[0].tolist()
+    prompt_len = input_ids.shape[1]
+
+    generated = []
+    acceptance_lengths = []
+
+    start = time.time()
+    with torch.no_grad():
+        # Prefill — KEEP head logits (seeds the first tree's proposals).
+        orig_logits, head_logits, past_kv = model(input_ids, use_cache=True)
+        lm_token = orig_logits[0, -1, :].argmax().item()
+        generated.append(lm_token)
+        prefix_len = prompt_len  # past_kv excludes lm_token
+        # Head k at hidden position L-1 predicts token at L+k+1 → tree depth k+1.
+        head_preds = [head_logits[k][0, -1, :] for k in range(model.num_heads)]
+
+        while len(generated) < max_new_tokens and lm_token != eos_id:
+            top_per_head = [
+                head_preds[k].topk(S_K[k]).indices.unsqueeze(0)
+                for k in range(len(S_K))
+            ]
+            tree_tokens, tree_parent_indices = _build_tree_for_mode(
+                top_per_head, tree_mode, tree_budget,
+            )
+            tree_size = tree_tokens.shape[0]
+
+            # Verify input = [lm_token, tree_tokens]. lm_token lands at position
+            # prefix_len; tree depth-d lands at prefix_len + d.
+            verify_input = torch.cat([
+                torch.tensor([lm_token], device=device),
+                tree_tokens.to(device),
+            ]).unsqueeze(0)
+
+            # Attention mask: lm_token row attends to the real prefix + itself.
+            # Tree rows attend to (prefix + lm_token) as the "prefix" and ancestors.
+            tree_mask = generate_tree_mask(tree_parent_indices, prefix_len + 1)
+            lm_row = torch.zeros(prefix_len + 1 + tree_size, dtype=torch.bool)
+            lm_row[: prefix_len + 1] = True
+            full_mask = torch.cat([lm_row.unsqueeze(0), tree_mask], dim=0)
+            full_mask_4d = _bool_to_additive_4d(full_mask, dtype=dtype).to(device)
+
+            tree_positions = generate_position_ids(tree_parent_indices, prefix_len + 1)
+            full_positions = torch.cat([
+                torch.tensor([prefix_len], dtype=torch.long),
+                tree_positions,
+            ]).unsqueeze(0).to(device)
+
+            verify_orig_logits, verify_head_logits, past_kv_verify = model(
+                verify_input,
+                attention_mask=full_mask_4d,
+                position_ids=full_positions,
+                past_key_values=past_kv,
+                use_cache=True,
+            )
+
+            # lm_token's LM prediction checks depth-1 roots; tree-node
+            # predictions (indices 1..tree_size) check their children.
+            prop_like = verify_orig_logits[0, 0, :]
+            tree_verify = verify_orig_logits[0, 1:, :]
+            accepted_path = accept_fn(
+                prop_like, tree_verify, tree_tokens, tree_parent_indices,
+            )
+            accepted_tokens = [tree_tokens[i].item() for i in accepted_path]
+
+            # KV surgery: keep [prefix + lm_token] + accepted tree positions.
+            keep = list(range(prefix_len + 1)) + [
+                prefix_len + 1 + i for i in accepted_path
+            ]
+            past_kv = _gather_kv_positions(
+                past_kv_verify,
+                torch.tensor(keep, dtype=torch.long, device=device),
+            )
+
+            generated.extend(accepted_tokens)
+            acceptance_lengths.append(len(accepted_path))
+            prefix_len = prefix_len + 1 + len(accepted_path)
+
+            if eos_id is not None and eos_id in accepted_tokens:
+                break
+
+            # Re-seed lm_token and head_preds from the hidden state at the last
+            # committed position. Verify-output index 0 = lm_token; 1+i = tree node i.
+            last_idx = 1 + accepted_path[-1] if accepted_path else 0
+            lm_token = verify_orig_logits[0, last_idx, :].argmax().item()
+            head_preds = [
+                verify_head_logits[k][0, last_idx, :] for k in range(model.num_heads)
+            ]
+            generated.append(lm_token)
+
+    total_time = time.time() - start
+    tps = len(generated) / total_time if total_time > 0 else 0.0
+    avg_acceptance = (sum(acceptance_lengths) / len(acceptance_lengths)
+                      if acceptance_lengths else 0.0)
+
+    if eos_id is not None and eos_id in generated:
+        generated = generated[: generated.index(eos_id) + 1]
+    generated = generated[:max_new_tokens]
+    text = tokenizer.decode(prompt_ids + generated, skip_special_tokens=True)
+    return text, avg_acceptance, tps
+
+
+def _medusa_decode_extra_forward(model, tokenizer, prompt, max_new_tokens,
+                                 acceptance="greedy", tree_budget=64,
+                                 tree_mode="optimized"):
+    """Stretch-goal alternative: dedicated proposal forward, guaranteed bonus token.
+
+    Two forwards per step:
+      1. Proposal forward (`lm_token` alone) → prop_orig_logits + prop_head_logits
+         from the hidden state at `lm_token`'s position.
+      2. Verify forward (`[lm_token_2, tree_tokens]`) where
+         `lm_token_2 = argmax(prop_orig_logits)` is committed unconditionally.
+
+    The tree roots at position `prefix_len + 1` (one past lm_token_2) and its
+    4 depths are sourced from heads 0-3 (all K heads). Each step guarantees
+    at least 2 new tokens (lm_token_2 + next lm_token from verify) plus any
+    accepted tree tokens.
     """
     device = next(model.parameters()).device
     dtype = next(model.parameters()).dtype
@@ -165,14 +328,20 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
         prefix_len = prompt_len  # tokens currently in past_kv (excludes lm_token)
 
         while len(generated) < max_new_tokens and lm_token != eos_id:
-            # Proposal pass: forward lm_token alone
+            # Proposal pass: forward lm_token alone.
             lm_input = torch.tensor([[lm_token]], device=device)
             prop_orig_logits, prop_head_logits, past_kv = model(
                 lm_input, past_key_values=past_kv, use_cache=True,
             )
             prefix_len += 1  # past_kv now includes lm_token
 
-            # Build static-topology candidate tree from per-head top-k
+            # Guaranteed bonus: base-LM argmax at lm_token's hidden state.
+            # This will be committed unconditionally at position prefix_len.
+            lm_token_2 = prop_orig_logits[0, 0, :].argmax().item()
+
+            # Tree uses all K heads. Head k at lm_token's hidden state predicts
+            # position prefix_len + k + 1 — so tree depth-1 at prefix_len+1 is
+            # head 0, depth-4 at prefix_len+4 is head 3.
             top_per_head = [
                 prop_head_logits[k][0, 0, :].topk(S_K[k]).indices.unsqueeze(0)
                 for k in range(len(S_K))
@@ -180,48 +349,64 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
             tree_tokens, tree_parent_indices = _build_tree_for_mode(
                 top_per_head, tree_mode, tree_budget,
             )
+            tree_size = tree_tokens.shape[0]
 
-            # Verify pass: all candidates in one forward with custom mask + positions
-            tree_mask_bool = generate_tree_mask(tree_parent_indices, prefix_len)
-            tree_mask_4d = _bool_to_additive_4d(tree_mask_bool, dtype=dtype).to(device)
-            position_ids = generate_position_ids(
-                tree_parent_indices, prefix_len,
-            ).unsqueeze(0).to(device)
+            # Verify input = [lm_token_2, tree_tokens]. lm_token_2 at position
+            # prefix_len; tree depth-d at prefix_len + d.
+            verify_input = torch.cat([
+                torch.tensor([lm_token_2], device=device),
+                tree_tokens.to(device),
+            ]).unsqueeze(0)
+
+            tree_mask = generate_tree_mask(tree_parent_indices, prefix_len + 1)
+            lm_row = torch.zeros(prefix_len + 1 + tree_size, dtype=torch.bool)
+            lm_row[: prefix_len + 1] = True
+            full_mask = torch.cat([lm_row.unsqueeze(0), tree_mask], dim=0)
+            full_mask_4d = _bool_to_additive_4d(full_mask, dtype=dtype).to(device)
+
+            tree_positions = generate_position_ids(tree_parent_indices, prefix_len + 1)
+            full_positions = torch.cat([
+                torch.tensor([prefix_len], dtype=torch.long),
+                tree_positions,
+            ]).unsqueeze(0).to(device)
 
             verify_orig_logits, _, past_kv_verify = model(
-                tree_tokens.unsqueeze(0).to(device),
-                attention_mask=tree_mask_4d,
-                position_ids=position_ids,
+                verify_input,
+                attention_mask=full_mask_4d,
+                position_ids=full_positions,
                 past_key_values=past_kv,
                 use_cache=True,
             )
 
-            # Accept along the longest verifiable path
+            # Accept: lm_token_2 always accepted. Depth-1 roots checked against
+            # lm_token_2's LM prediction; tree nodes check their children.
+            prop_like = verify_orig_logits[0, 0, :]
+            tree_verify = verify_orig_logits[0, 1:, :]
             accepted_path = accept_fn(
-                prop_orig_logits[0, 0, :], verify_orig_logits[0],
-                tree_tokens, tree_parent_indices,
+                prop_like, tree_verify, tree_tokens, tree_parent_indices,
             )
             accepted_tokens = [tree_tokens[i].item() for i in accepted_path]
 
-            # KV surgery: keep prefix + accepted tree positions only
-            keep = list(range(prefix_len)) + [prefix_len + i for i in accepted_path]
+            # KV surgery: keep prefix + lm_token_2 + accepted tree positions.
+            keep = list(range(prefix_len + 1)) + [
+                prefix_len + 1 + i for i in accepted_path
+            ]
             past_kv = _gather_kv_positions(
                 past_kv_verify,
                 torch.tensor(keep, dtype=torch.long, device=device),
             )
 
+            generated.append(lm_token_2)
             generated.extend(accepted_tokens)
             acceptance_lengths.append(len(accepted_path))
-            prefix_len += len(accepted_path)
+            prefix_len = prefix_len + 1 + len(accepted_path)
 
-            if eos_id is not None and eos_id in accepted_tokens:
+            if eos_id is not None and (lm_token_2 == eos_id or eos_id in accepted_tokens):
                 break
 
-            # Bonus token: from verify logits at last accepted node, else from proposal
-            if accepted_path:
-                lm_token = verify_orig_logits[0, accepted_path[-1], :].argmax().item()
-            else:
-                lm_token = prop_orig_logits[0, 0, :].argmax().item()
+            # Next lm_token: base LM at the last committed verify position.
+            last_idx = 1 + accepted_path[-1] if accepted_path else 0
+            lm_token = verify_orig_logits[0, last_idx, :].argmax().item()
             generated.append(lm_token)
 
     total_time = time.time() - start
@@ -240,13 +425,14 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
 # ----- Aggregation --------------------------------------------------------
 
 def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budget,
-               tree_mode="optimized"):
+               tree_mode="optimized", design="paper"):
     """Run medusa_decode on each prompt and return a per-prompt result list."""
     results = []
     for prompt in prompts:
         text, acc_rate, tps = medusa_decode(
             model, tokenizer, prompt, max_new_tokens,
             acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
+            design=design,
         )
         snippet = text[len(prompt):len(prompt) + 80].replace("\n", " ")
         print(f"  [{prompt[:30]}...] acc={acc_rate:.2f} tps={tps:.1f} | {snippet}")
@@ -257,12 +443,16 @@ def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budge
     return results
 
 
-def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64):
+def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64,
+                   design="paper"):
     """Greedy vs typical acceptance comparison."""
     out = {}
     for mode in ("greedy", "typical"):
         print(f"\n--- Acceptance: {mode} ---")
-        results = run_medusa(model, tokenizer, prompts, max_new_tokens, mode, tree_budget)
+        results = run_medusa(
+            model, tokenizer, prompts, max_new_tokens, mode, tree_budget,
+            design=design,
+        )
         avg_acc = _avg(results, "acceptance_rate")
         avg_tps = _avg(results, "tps")
         print(f"  => avg acceptance_rate={avg_acc:.3f}  avg_tps={avg_tps:.2f}")
@@ -273,7 +463,8 @@ def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64):
 
 
 def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
-                        output_dir, model_id, acceptance="greedy"):
+                        output_dir, model_id, acceptance="greedy",
+                        design="paper"):
     """Table 3 ablation (paper §3.2): measures speedup for three tree modes
     sharing one greedy baseline. Saves `table3_<model_short>.json`.
 
@@ -293,6 +484,7 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
         results = run_medusa(
             medusa_model, tokenizer, prompts, max_new_tokens,
             acceptance=acceptance, tree_budget=64, tree_mode=mode,
+            design=design,
         )
         medusa_tps = _avg(results, "tps")
         avg_acc = _avg(results, "acceptance_rate")
@@ -311,6 +503,7 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
         json.dump({
             "model": model_id,
             "acceptance": acceptance,
+            "design": design,
             "greedy_tps": greedy_tps,
             "greedy_results": greedy_results,
             "rows": rows,
@@ -345,7 +538,8 @@ def compute_head_accuracy(model, tokenizer, prompts, max_length=512):
 
 
 def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
-                       output_dir, model_id, out_filename=None):
+                       output_dir, model_id, out_filename=None,
+                       design="paper"):
     """Greedy baseline + Medusa + per-head accuracy in one pass; saves JSON."""
     if out_filename is None:
         out_filename = f"{model_id.split('/')[-1]}_benchmark.json"
@@ -355,8 +549,10 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
     greedy_tps = _avg(greedy_results, "tps")
     print(f"Avg greedy TPS: {greedy_tps:.2f}")
 
-    print("\n--- Medusa inference (greedy acceptance, 64-node tree) ---")
-    medusa_results = run_medusa(medusa_model, tokenizer, prompts, max_new_tokens, "greedy", 64)
+    print(f"\n--- Medusa inference (greedy acceptance, 64-node tree, design={design}) ---")
+    medusa_results = run_medusa(
+        medusa_model, tokenizer, prompts, max_new_tokens, "greedy", 64, design=design,
+    )
     medusa_tps = _avg(medusa_results, "tps")
     avg_acc = _avg(medusa_results, "acceptance_rate")
     speedup = medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
@@ -370,6 +566,7 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
 
     results = {
         "model": model_id,
+        "design": design,
         "greedy_tps": greedy_tps,
         "medusa_tps": medusa_tps,
         "speedup_ratio": speedup,
@@ -456,6 +653,11 @@ def main():
                         help="With --mode medusa: run greedy vs typical and save comparison")
     parser.add_argument("--quantize", action="store_true",
                         help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs.")
+    parser.add_argument("--design", choices=["paper", "extra_forward"], default="paper",
+                        help="Propose/verify structure. 'paper' = single verify forward, "
+                             "heads 0-K-1 at tree depths 1-K (§2.3 / Figure 6). "
+                             "'extra_forward' = stretch-goal variant with a separate proposal "
+                             "forward and a guaranteed bonus token per step (still uses all heads).")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -478,6 +680,7 @@ def main():
         run_full_benchmark(
             medusa_model, tokenizer, prompts,
             args.max_new_tokens, output_dir, model_id=args.model_id,
+            design=args.design,
         )
         return
 
@@ -487,6 +690,7 @@ def main():
         run_table3_ablation(
             medusa_model, tokenizer, prompts, args.max_new_tokens,
             output_dir, model_id=args.model_id, acceptance=args.acceptance,
+            design=args.design,
         )
         return
 
@@ -505,11 +709,12 @@ def main():
         if args.compare:
             comparison = run_comparison(
                 medusa_model, tokenizer, prompts, args.max_new_tokens,
-                tree_budget=args.tree_budget,
+                tree_budget=args.tree_budget, design=args.design,
             )
             comparison["selected_tree_budget"] = args.tree_budget
             comparison["tree_mode"] = args.tree
             comparison["model_id"] = args.model_id
+            comparison["design"] = args.design
             out_file = os.path.join(output_dir, "comparison.json")
             with open(out_file, "w") as f:
                 json.dump(comparison, f, indent=4)
@@ -518,6 +723,7 @@ def main():
             results = run_medusa(
                 medusa_model, tokenizer, prompts, args.max_new_tokens,
                 args.acceptance, args.tree_budget, tree_mode=args.tree,
+                design=args.design,
             )
             avg_tps = _avg(results, "tps")
             avg_acc = _avg(results, "acceptance_rate")
@@ -531,6 +737,7 @@ def main():
                     "acceptance_mode": args.acceptance,
                     "tree_mode": args.tree,
                     "tree_budget": args.tree_budget,
+                    "design": args.design,
                     "results": results,
                 }, f, indent=4)
             print(f"Results saved to {out_file}")
