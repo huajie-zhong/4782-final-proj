@@ -11,7 +11,7 @@ import argparse
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
-from transformers import AutoModelForCausalLM, AutoTokenizer, get_cosine_schedule_with_warmup
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, get_cosine_schedule_with_warmup
 from torch.optim import AdamW
 
 from model import MedusaModel
@@ -27,9 +27,26 @@ def train(args):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         
-    backbone = AutoModelForCausalLM.from_pretrained(args.model_name)
-    model = MedusaModel(backbone, num_heads=4)
-    model.to(device)
+    if args.quantize:
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+        backbone = AutoModelForCausalLM.from_pretrained(
+            args.model_name,
+            quantization_config=bnb_config,
+            attn_implementation="eager",
+            device_map={"": device},
+        )
+        model = MedusaModel(backbone, num_heads=4)
+        # Backbone is already placed by device_map; only move heads (bnb forbids .to on the whole model).
+        model.heads.to(device)
+    else:
+        backbone = AutoModelForCausalLM.from_pretrained(args.model_name)
+        model = MedusaModel(backbone, num_heads=4)
+        model.to(device)
 
     # Verify what is trainable
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -186,7 +203,8 @@ if __name__ == "__main__":
     parser.add_argument("--warmup_steps", type=int, default=100, help="Warmup steps for scheduler")
     parser.add_argument("--log_interval", type=int, default=50, help="Steps between logging")
     parser.add_argument("--save_path", type=str, default="../results/medusa_heads.pt", help="Path to save weights")
-    
+    parser.add_argument("--quantize", action="store_true", help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs.")
+
     args = parser.parse_args()
     
     # Adjust save_path to be relative to the script location or working dir
