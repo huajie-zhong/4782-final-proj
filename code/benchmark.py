@@ -272,13 +272,111 @@ def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64):
 
 
 # ---------------------------------------------------------------------------
+# Full benchmark (model-agnostic)
+# ---------------------------------------------------------------------------
+
+def compute_head_accuracy(model, tokenizer, prompts, max_length=512):
+    """
+    Compute per-head top-1 accuracy on the evaluation prompts.
+    Each head k predicts token at position t+k+2; we compare against ground-truth.
+    Returns a list of floats, one per head.
+    """
+    device = next(model.parameters()).device
+    head_correct = [0] * model.num_heads
+    head_total = [0] * model.num_heads
+
+    with torch.no_grad():
+        for prompt in prompts:
+            input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+            if input_ids.shape[1] > max_length:
+                input_ids = input_ids[:, :max_length]
+            if input_ids.shape[1] < 4:
+                continue
+
+            _, head_logits = model(input_ids)
+
+            for k in range(model.num_heads):
+                shift = k + 2
+                if input_ids.shape[1] <= shift:
+                    continue
+                logits_k = head_logits[k][0, :-shift, :]   # (seq-shift, vocab)
+                targets_k = input_ids[0, shift:]            # (seq-shift,)
+                preds = logits_k.argmax(dim=-1)
+                head_correct[k] += (preds == targets_k).sum().item()
+                head_total[k] += targets_k.shape[0]
+
+    return [head_correct[k] / max(1, head_total[k]) for k in range(model.num_heads)]
+
+
+def run_full_benchmark(medusa_model, backbone, tokenizer, prompts, max_new_tokens,
+                       output_dir, model_id="unknown", out_filename=None):
+    """
+    Model-agnostic full benchmark: greedy baseline vs Medusa inference.
+    Collects greedy TPS, Medusa TPS, speedup ratio, acceptance rate,
+    and per-head top-1 accuracy. Saves a JSON to output_dir/out_filename.
+
+    Args:
+        model_id: HuggingFace model identifier string (used for labelling output).
+        out_filename: output JSON filename; defaults to <model_short_name>_benchmark.json.
+    """
+    if out_filename is None:
+        short_name = model_id.split("/")[-1]
+        out_filename = f"{short_name}_benchmark.json"
+    # Greedy baseline
+    print("\n--- Greedy baseline ---")
+    greedy_results = greedy_baseline(backbone, tokenizer, prompts, max_new_tokens)
+    greedy_tps = sum(r["tps"] for r in greedy_results) / len(greedy_results)
+    print(f"Avg greedy TPS: {greedy_tps:.2f}")
+
+    # Medusa inference (greedy acceptance, 64-node tree)
+    print("\n--- Medusa inference (greedy acceptance, 64-node tree) ---")
+    medusa_results = []
+    for prompt in prompts:
+        text, acc_rate, tps = medusa_decode(
+            medusa_model, tokenizer, prompt, max_new_tokens,
+            acceptance="greedy", tree_budget=64,
+        )
+        snippet = text[len(prompt):len(prompt) + 80].replace("\n", " ")
+        print(f"  [{prompt[:30]}...] acc={acc_rate:.2f} tps={tps:.1f} | {snippet}")
+        medusa_results.append({"prompt": prompt, "acceptance_rate": acc_rate, "tps": tps})
+
+    medusa_tps = sum(r["tps"] for r in medusa_results) / len(medusa_results)
+    avg_acc_rate = sum(r["acceptance_rate"] for r in medusa_results) / len(medusa_results)
+    speedup = medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
+    print(f"Avg Medusa TPS: {medusa_tps:.2f} | Speedup: {speedup:.2f}x | Avg acceptance: {avg_acc_rate:.3f}")
+
+    # Per-head accuracy on eval prompts
+    print("\n--- Per-head accuracy (on eval prompts) ---")
+    head_accs = compute_head_accuracy(medusa_model, tokenizer, prompts)
+    for k, acc in enumerate(head_accs):
+        print(f"  Head {k}: {acc:.3f}")
+
+    results = {
+        "model": model_id,
+        "greedy_tps": greedy_tps,
+        "medusa_tps": medusa_tps,
+        "speedup_ratio": speedup,
+        "avg_acceptance_rate": avg_acc_rate,
+        "head_accuracies": {f"head_{k}": head_accs[k] for k in range(len(head_accs))},
+        "greedy_results": greedy_results,
+        "medusa_results": medusa_results,
+    }
+
+    out_file = os.path.join(output_dir, out_filename)
+    with open(out_file, "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"\nResults saved to {out_file}")
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="MEDUSA Benchmark")
-    parser.add_argument("--mode", choices=["greedy", "medusa", "both"], default="both",
-                        help="Which decoding mode(s) to benchmark")
+    parser.add_argument("--mode", choices=["greedy", "medusa", "both", "full"], default="both",
+                        help="greedy|medusa|both: individual runs; full: greedy+medusa+head-accuracy in one pass")
     parser.add_argument("--acceptance", choices=["greedy", "typical"], default="greedy",
                         help="Acceptance criterion for Medusa decoding")
     parser.add_argument("--tree_budget", type=int, choices=[32, 64], default=64,
@@ -335,7 +433,7 @@ def main():
             args.model_id, torch_dtype=torch.float16,
             attn_implementation="eager",
         ).to(device)
-        medusa_model = MedusaModel(backbone, num_heads=4)
+        medusa_model = MedusaModel(backbone, num_heads=4).to(device)
 
         ckpt_path = args.checkpoint or os.path.join(output_dir, "medusa_heads.pt")
         if os.path.exists(ckpt_path):
@@ -392,6 +490,32 @@ def main():
                     "results": medusa_results,
                 }, f, indent=4)
             print(f"Results saved to {out_file}")
+
+
+    # ------------------------------------------------------------------
+    # Full benchmark (greedy + Medusa + head accuracy in one pass)
+    # ------------------------------------------------------------------
+    if args.mode == "full":
+        print(f"\n=== Full Benchmark — {args.model_id} ===")
+        backbone = AutoModelForCausalLM.from_pretrained(
+            args.model_id, torch_dtype=torch.float16,
+            attn_implementation="eager",
+        ).to(device)
+        medusa_model = MedusaModel(backbone, num_heads=4).to(device)
+
+        ckpt_path = args.checkpoint or os.path.join(output_dir, "medusa_heads.pt")
+        if os.path.exists(ckpt_path):
+            state_dict = torch.load(ckpt_path, map_location=device)
+            medusa_model.heads.load_state_dict(state_dict)
+            print(f"Loaded head checkpoint from {ckpt_path}")
+        else:
+            print(f"WARNING: No checkpoint at {ckpt_path}. Using untrained heads.")
+
+        medusa_model.eval()
+        run_full_benchmark(
+            medusa_model, backbone, tokenizer, prompts,
+            args.max_new_tokens, output_dir, model_id=args.model_id,
+        )
 
 
 if __name__ == "__main__":
