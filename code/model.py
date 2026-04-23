@@ -18,8 +18,9 @@ class MedusaHead(nn.Module):
     def __init__(self, hidden_size, vocab_size, lm_head_weights):
         super().__init__()
         dtype = lm_head_weights.dtype
-        self.linear1 = nn.Linear(hidden_size, hidden_size, bias=False, dtype=dtype)  # W1
-        self.linear2 = nn.Linear(hidden_size, vocab_size, bias=False, dtype=dtype)   # W2
+        device = lm_head_weights.device
+        self.linear1 = nn.Linear(hidden_size, hidden_size, bias=False, dtype=dtype, device=device)  # W1
+        self.linear2 = nn.Linear(hidden_size, vocab_size, bias=False, dtype=dtype, device=device)   # W2
         
         # CRITICAL INITIALIZATION (paper §2.1.1):
         nn.init.zeros_(self.linear1.weight)         # W1 -> zero
