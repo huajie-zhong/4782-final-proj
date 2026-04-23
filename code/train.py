@@ -37,7 +37,7 @@ def train(args):
 
     # 2. Data loading
     print("Preparing data...")
-    tokenized_data = download_and_preprocess(tokenizer, max_samples=args.max_samples)
+    tokenized_data = download_and_preprocess(tokenizer, max_samples=args.max_samples, max_length=args.max_length)
     dataset = MedusaDataset(tokenized_data, max_length=args.max_length, pad_token_id=tokenizer.pad_token_id)
 
     # Split train/val
