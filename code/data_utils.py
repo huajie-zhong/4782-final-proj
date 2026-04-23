@@ -8,10 +8,11 @@ Contains the MedusaDataset class for data loading.
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-def download_and_preprocess(tokenizer, max_samples=None):
+def download_and_preprocess(tokenizer, max_samples=None, max_length=2048):
     """
     Downloads and preprocesses ShareGPT dataset.
     Filters for assistant-turn text only and concatenates multi-turn responses.
+    Truncates at tokenization time to max_length so no oversized tensors are stored.
     """
     try:
         from datasets import load_dataset
@@ -53,12 +54,23 @@ def download_and_preprocess(tokenizer, max_samples=None):
             processed_texts.append(concatenated_text)
 
     print(f"Tokenizing {len(processed_texts)} samples...")
-    # Tokenize (we don't pad or truncate here, that's done in the dataset class)
-    tokenized_data = []
-    for text in processed_texts:
-        tokens = tokenizer(text, truncation=False, return_tensors="pt")
-        tokenized_data.append(tokens)
-        
+    # Batch tokenize: pass all texts at once — HuggingFace fast tokenizers run in Rust
+    # and parallelize internally, making this 10-50x faster than a per-sample loop.
+    # padding=False so MedusaDataset handles padding/truncation per-item as before.
+    batch_encoding = tokenizer(
+        processed_texts,
+        truncation=True,
+        max_length=max_length,
+        padding=False,
+        return_tensors=None,   # return Python lists; convert to tensors below
+    )
+    tokenized_data = [
+        {
+            "input_ids": torch.tensor(batch_encoding["input_ids"][i], dtype=torch.long).unsqueeze(0),
+            "attention_mask": torch.tensor(batch_encoding["attention_mask"][i], dtype=torch.long).unsqueeze(0),
+        }
+        for i in range(len(processed_texts))
+    ]
     return tokenized_data
 
 class MedusaDataset(Dataset):
