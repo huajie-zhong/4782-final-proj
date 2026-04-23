@@ -27,25 +27,32 @@ def train(args):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         
+    # Mixed precision: bf16 backbone (matches the reference Medusa-1 train_legacy.py
+    # which loads with torch_dtype=bfloat16) + fp32 heads so AdamW state and loss
+    # accumulation stay in fp32. Compute runs under autocast(bf16).
+    compute_dtype = torch.bfloat16
+    head_dtype = torch.float32
+
     if args.quantize:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_compute_dtype=compute_dtype,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
         )
+        # Note: eager attn is only required for the tree-mask at inference
+        # (benchmark.py). For training, let HF pick SDPA/FA2.
         backbone = AutoModelForCausalLM.from_pretrained(
             args.model_name,
             quantization_config=bnb_config,
-            attn_implementation="eager",
             device_map={"": device},
         )
-        model = MedusaModel(backbone, num_heads=4)
+        model = MedusaModel(backbone, num_heads=4, head_dtype=head_dtype)
         # Backbone is already placed by device_map; only move heads (bnb forbids .to on the whole model).
         model.heads.to(device)
     else:
-        backbone = AutoModelForCausalLM.from_pretrained(args.model_name)
-        model = MedusaModel(backbone, num_heads=4)
+        backbone = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=compute_dtype)
+        model = MedusaModel(backbone, num_heads=4, head_dtype=head_dtype)
         model.to(device)
 
     # Verify what is trainable
@@ -62,8 +69,13 @@ def train(args):
     train_size = len(dataset) - val_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    dl_kwargs = dict(
+        num_workers=args.num_workers,
+        pin_memory=(device.type == "cuda"),
+        persistent_workers=(args.num_workers > 0),
+    )
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, **dl_kwargs)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, **dl_kwargs)
 
     print(f"Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}")
 
@@ -85,103 +97,107 @@ def train(args):
     # 4. Training Loop
     os.makedirs(os.path.dirname(args.save_path), exist_ok=True)
 
+    # Accumulators stay on GPU until log time to avoid per-step .item() syncs.
+    use_autocast = (device.type == "cuda")
+    autocast_ctx = (lambda: torch.autocast(device_type="cuda", dtype=compute_dtype)) \
+                   if use_autocast else (lambda: torch.cuda.amp.autocast(enabled=False))
+
     for epoch in range(args.epochs):
         model.train()
-        total_loss = 0
-        head_accuracies = [0.0] * model.num_heads
-        total_tokens = 0
-        
-        optimizer.zero_grad()
-        
+        head_acc_sums = torch.zeros(model.num_heads, device=device)
+        total_tokens = torch.zeros((), device=device, dtype=torch.long)
+        last_loss_scalar = torch.zeros((), device=device)
+
+        optimizer.zero_grad(set_to_none=True)
+
         for step, batch in enumerate(train_loader):
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
+            input_ids = batch["input_ids"].to(device, non_blocking=True)
+            attention_mask = batch["attention_mask"].to(device, non_blocking=True)
 
-            # Forward pass
-            # We don't need the original logits for training the Medusa heads
-            _, head_logits = model(input_ids, attention_mask=attention_mask)
-            
-            loss = 0
-            batch_head_accs = [0.0] * model.num_heads
-            batch_valid_tokens = 0
+            # Skip original_logits — it's unused during training and costs a full
+            # (B, T, vocab) matmul through the backbone's LM head per step.
+            with autocast_ctx():
+                _, head_logits = model(
+                    input_ids, attention_mask=attention_mask, compute_original_logits=False
+                )
 
-            for k in range(model.num_heads):
-                # Label shifting: Head k predicts t + k + 2
-                shift = k + 2
-                
-                # Truncate logits and targets
-                # shape: (batch_size, seq_len, vocab_size)
-                logits_k = head_logits[k][:, :-shift, :].contiguous().view(-1, head_logits[k].size(-1))
-                targets_k = input_ids[:, shift:].contiguous().view(-1)
-                mask_k = attention_mask[:, shift:].contiguous().view(-1)
+                loss = input_ids.new_zeros((), dtype=torch.float32)
 
-                # Filter by mask
-                valid_indices = mask_k == 1
-                logits_k = logits_k[valid_indices]
-                targets_k = targets_k[valid_indices]
+                for k in range(model.num_heads):
+                    # Label shifting: Head k predicts t + k + 2
+                    shift = k + 2
 
-                if targets_k.numel() == 0:
-                    continue
+                    logits_k = head_logits[k][:, :-shift, :].contiguous().view(-1, head_logits[k].size(-1))
+                    targets_k = input_ids[:, shift:].contiguous().view(-1)
+                    mask_k = attention_mask[:, shift:].contiguous().view(-1)
 
-                # Compute Cross-Entropy Loss
-                ce_loss = F.cross_entropy(logits_k, targets_k)
-                loss += lambda_weights[k] * ce_loss
+                    valid_indices = mask_k == 1
+                    logits_k = logits_k[valid_indices]
+                    targets_k = targets_k[valid_indices]
 
-                # Compute Top-1 Accuracy for logging
-                preds = torch.argmax(logits_k, dim=-1)
-                acc = (preds == targets_k).float().sum().item()
-                batch_head_accs[k] = acc
-                
-                if k == 0:
-                    batch_valid_tokens = targets_k.numel()
+                    if targets_k.numel() == 0:
+                        continue
 
-            # Normalize loss by grad_accum_steps
+                    # cross_entropy is autocast-promoted to fp32 for stability.
+                    ce_loss = F.cross_entropy(logits_k, targets_k)
+                    loss = loss + lambda_weights[k] * ce_loss
+
+                    # Accumulate accuracy on-device; no .item() per step.
+                    with torch.no_grad():
+                        preds = torch.argmax(logits_k, dim=-1)
+                        head_acc_sums[k] += (preds == targets_k).sum()
+                        if k == 0:
+                            total_tokens += targets_k.numel()
+
             loss = loss / args.grad_accum_steps
             loss.backward()
-            
-            total_loss += loss.item() * args.grad_accum_steps
-            for k in range(model.num_heads):
-                head_accuracies[k] += batch_head_accs[k]
-            total_tokens += batch_valid_tokens
+            last_loss_scalar = loss.detach() * args.grad_accum_steps
 
             if (step + 1) % args.grad_accum_steps == 0 or (step + 1) == len(train_loader):
                 optimizer.step()
                 scheduler.step()
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
             if (step + 1) % args.log_interval == 0:
-                avg_accs = [acc / max(1, total_tokens) for acc in head_accuracies]
-                print(f"Epoch {epoch+1} | Step {step+1}/{len(train_loader)} | Loss: {loss.item() * args.grad_accum_steps:.4f} | Head Acc: {[f'{a:.3f}' for a in avg_accs]}")
+                # Single sync point per log interval.
+                denom = total_tokens.clamp(min=1).to(torch.float32)
+                avg_accs = (head_acc_sums / denom).tolist()
+                print(f"Epoch {epoch+1} | Step {step+1}/{len(train_loader)} | "
+                      f"Loss: {last_loss_scalar.item():.4f} | "
+                      f"Head Acc: {[f'{a:.3f}' for a in avg_accs]}")
 
         # Validation
         model.eval()
-        val_head_accs = [0.0] * model.num_heads
-        val_tokens = 0
-        
-        with torch.no_grad():
+        val_head_accs = torch.zeros(model.num_heads, device=device)
+        val_tokens = torch.zeros((), device=device, dtype=torch.long)
+
+        with torch.no_grad(), autocast_ctx():
             for batch in val_loader:
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                
-                _, head_logits = model(input_ids, attention_mask=attention_mask)
-                
+                input_ids = batch["input_ids"].to(device, non_blocking=True)
+                attention_mask = batch["attention_mask"].to(device, non_blocking=True)
+
+                _, head_logits = model(
+                    input_ids, attention_mask=attention_mask, compute_original_logits=False
+                )
+
                 for k in range(model.num_heads):
                     shift = k + 2
                     logits_k = head_logits[k][:, :-shift, :].contiguous().view(-1, head_logits[k].size(-1))
                     targets_k = input_ids[:, shift:].contiguous().view(-1)
                     mask_k = attention_mask[:, shift:].contiguous().view(-1)
-                    
+
                     valid_indices = mask_k == 1
                     logits_k = logits_k[valid_indices]
                     targets_k = targets_k[valid_indices]
-                    
+
                     if targets_k.numel() > 0:
                         preds = torch.argmax(logits_k, dim=-1)
-                        val_head_accs[k] += (preds == targets_k).float().sum().item()
+                        val_head_accs[k] += (preds == targets_k).sum()
                         if k == 0:
                             val_tokens += targets_k.numel()
-                            
-        val_accs = [acc / max(1, val_tokens) for acc in val_head_accs]
+
+        denom = val_tokens.clamp(min=1).to(torch.float32)
+        val_accs = (val_head_accs / denom).tolist()
         print(f"--- Epoch {epoch+1} Validation ---")
         print(f"Head Accuracies: {[f'{a:.3f}' for a in val_accs]}")
 
@@ -204,6 +220,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_interval", type=int, default=50, help="Steps between logging")
     parser.add_argument("--save_path", type=str, default="../results/medusa_heads.pt", help="Path to save weights")
     parser.add_argument("--quantize", action="store_true", help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs.")
+    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers (0 disables multiprocessing).")
 
     args = parser.parse_args()
     
