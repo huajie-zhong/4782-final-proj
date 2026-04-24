@@ -558,25 +558,45 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
 
 
 def compute_head_accuracy(model, tokenizer, prompts, max_length=512, model_id=""):
-    """Per-head top-1 accuracy on eval prompts. Head k predicts token at t+k+2."""
+    """Per-head top-1 accuracy measured over *generated* assistant-turn tokens.
+
+    Generates 64 tokens per prompt (greedy, on-distribution with training), then
+    runs a single forward over prompt+generation and measures each head's
+    prediction accuracy starting from the last prompt position.
+    Head k at hidden position t predicts token t+k+2.
+    """
     device = next(model.parameters()).device
     correct = [0] * model.num_heads
     total = [0] * model.num_heads
+    gen_tokens = 64
 
     with torch.no_grad():
         for prompt in prompts:
             formatted = _format_prompt(tokenizer, prompt, model_id)
             input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
-            input_ids = input_ids[:, :max_length]
-            if input_ids.shape[1] < 4:
+            prompt_len = input_ids.shape[1]
+
+            # Generate assistant-turn tokens — same distribution the heads are trained on.
+            gen_ids = model.backbone.generate(
+                input_ids, max_new_tokens=gen_tokens, do_sample=False, use_cache=True,
+            )
+            gen_ids = gen_ids[:, :max_length]
+            if gen_ids.shape[1] <= prompt_len + 4:
                 continue
-            _, head_logits = model(input_ids)
+
+            # Single forward over prompt + generated sequence.
+            _, head_logits = model(gen_ids)
+
+            seq_len = gen_ids.shape[1]
             for k in range(model.num_heads):
                 shift = k + 2
-                if input_ids.shape[1] <= shift:
+                # Measure from the last prompt position onward so targets are generated tokens.
+                start_pos = prompt_len - 1
+                end_pos = seq_len - shift
+                if start_pos >= end_pos:
                     continue
-                preds = head_logits[k][0, :-shift, :].argmax(dim=-1)
-                targets = input_ids[0, shift:]
+                preds = head_logits[k][0, start_pos:end_pos, :].argmax(dim=-1)
+                targets = gen_ids[0, start_pos + shift:end_pos + shift]
                 correct[k] += (preds == targets).sum().item()
                 total[k] += targets.shape[0]
 
@@ -598,15 +618,26 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
     print(f"Avg greedy TPS: {greedy_tps:.2f}")
 
     print(f"\n--- Medusa inference (greedy acceptance, 64-node tree, design={design}) ---")
-    medusa_results = run_medusa(
+    medusa_results_greedy = run_medusa(
         medusa_model, tokenizer, prompts, max_new_tokens, "greedy", 64,
         design=design, model_id=model_id,
     )
-    medusa_tps = _avg(medusa_results, "tps")
-    avg_acc = _avg(medusa_results, "acceptance_rate")
-    speedup = medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
-    print(f"Avg Medusa TPS: {medusa_tps:.2f} | Speedup: {speedup:.2f}x | "
-          f"Avg acceptance: {avg_acc:.3f}")
+    greedy_medusa_tps = _avg(medusa_results_greedy, "tps")
+    greedy_avg_acc = _avg(medusa_results_greedy, "acceptance_rate")
+    greedy_speedup = greedy_medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
+    print(f"Avg Medusa TPS: {greedy_medusa_tps:.2f} | Speedup: {greedy_speedup:.2f}x | "
+          f"Avg acceptance: {greedy_avg_acc:.3f}")
+
+    print(f"\n--- Medusa inference (typical acceptance, 64-node tree, design={design}) ---")
+    medusa_results_typical = run_medusa(
+        medusa_model, tokenizer, prompts, max_new_tokens, "typical", 64,
+        design=design, model_id=model_id,
+    )
+    typical_medusa_tps = _avg(medusa_results_typical, "tps")
+    typical_avg_acc = _avg(medusa_results_typical, "acceptance_rate")
+    typical_speedup = typical_medusa_tps / greedy_tps if greedy_tps > 0 else 0.0
+    print(f"Avg Medusa TPS: {typical_medusa_tps:.2f} | Speedup: {typical_speedup:.2f}x | "
+          f"Avg acceptance: {typical_avg_acc:.3f}")
 
     print("\n--- Per-head accuracy ---")
     head_accs = compute_head_accuracy(medusa_model, tokenizer, prompts, model_id=model_id)
@@ -617,12 +648,17 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
         "model": model_id,
         "design": design,
         "greedy_tps": greedy_tps,
-        "medusa_tps": medusa_tps,
-        "speedup_ratio": speedup,
-        "avg_acceptance_rate": avg_acc,
+        # Greedy acceptance
+        "medusa_tps": greedy_medusa_tps,
+        "speedup_ratio": greedy_speedup,
+        "avg_acceptance_rate": greedy_avg_acc,
+        # Typical acceptance (paper-comparable)
+        "medusa_typical_tps": typical_medusa_tps,
+        "speedup_ratio_typical": typical_speedup,
+        "avg_acceptance_rate_typical": typical_avg_acc,
         "head_accuracies": {f"head_{k}": a for k, a in enumerate(head_accs)},
-        "greedy_results": greedy_results,
-        "medusa_results": medusa_results,
+        "greedy_results": medusa_results_greedy,
+        "typical_results": medusa_results_typical,
     }
     out_file = os.path.join(output_dir, out_filename)
     with open(out_file, "w") as f:

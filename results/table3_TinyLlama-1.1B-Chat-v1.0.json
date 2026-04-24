@@ -2,153 +2,153 @@
     "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
     "acceptance": "greedy",
     "design": "paper",
-    "greedy_tps": 72.02024152671663,
+    "greedy_tps": 33.63687733884419,
     "greedy_results": [
         {
             "prompt": "Write a Python script to sort a list.",
             "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
-            "tps": 73.19651773479066,
-            "total_time": 1.7487170696258545,
+            "tps": 33.27589611159787,
+            "total_time": 3.846628189086914,
             "generated_tokens": 128
         },
         {
             "prompt": "Explain the theory of relativity in simple terms.",
-            "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
-            "tps": 70.82944627607434,
-            "total_time": 1.8071579933166504,
+            "generated_text": "The theory of relativity is a scientific theory that explains how objects move and interact with each other in a way that is consistent with the principles of physics. It is based on the principle of relativity, which states that the laws of physics are the same for all observers, regardless of their location or velocity.\n\nThe theory of relativity is based on the idea that all objects in the universe are moving at the same speed, regardless of their mass or size. This means that objects that are moving at the same speed will appear to move at the same speed to an observer who is moving at the same speed.\n\nThe",
+            "tps": 33.932909063662,
+            "total_time": 3.7721493244171143,
             "generated_tokens": 128
         },
         {
             "prompt": "What are the benefits of eating healthy?",
             "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
-            "tps": 71.62879305281805,
-            "total_time": 1.7869908809661865,
+            "tps": 33.16200321705537,
+            "total_time": 3.8598392009735107,
             "generated_tokens": 128
         },
         {
             "prompt": "Compose a short poem about the moon.",
             "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
-            "tps": 71.59918925428518,
-            "total_time": 1.7877297401428223,
+            "tps": 33.9855622218583,
+            "total_time": 3.7663052082061768,
             "generated_tokens": 128
         },
         {
             "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
             "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
-            "tps": 72.84726131561493,
-            "total_time": 1.757101058959961,
+            "tps": 33.828016080047384,
+            "total_time": 3.783845901489258,
             "generated_tokens": 128
         }
     ],
     "rows": {
         "none": {
-            "medusa_tps": 115.98071508728847,
-            "speedup": 1.610390532282015,
-            "avg_acceptance_rate": 0.8641089943237741,
+            "medusa_tps": 53.00248653501634,
+            "speedup": 1.5757255348375803,
+            "avg_acceptance_rate": 0.8669748479823106,
             "results": [
                 {
                     "prompt": "Write a Python script to sort a list.",
                     "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
                     "acceptance_rate": 1.3518518518518519,
-                    "tps": 146.01787013959074
+                    "tps": 66.38425496298342
                 },
                 {
                     "prompt": "Explain the theory of relativity in simple terms.",
-                    "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
-                    "acceptance_rate": 0.573170731707317,
-                    "tps": 97.85145466366875
+                    "generated_text": "The theory of relativity is a scientific theory that explains how objects move and interact with each other in a way that is consistent with the principles of physics. It is based on the principle of relativity, which states that the laws of physics are the same for all observers, regardless of their location or velocity.\n\nThe theory of relativity is based on the idea that all objects in the universe are moving at the same speed, regardless of their mass or size. This means that objects that are moving at the same speed will appear to move at the same speed to an observer who is moving at the same speed.\n\nThe",
+                    "acceptance_rate": 0.5875,
+                    "tps": 44.43311700430575
                 },
                 {
                     "prompt": "What are the benefits of eating healthy?",
                     "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your overall physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of de",
                     "acceptance_rate": 0.8955223880597015,
-                    "tps": 120.02522521878012
+                    "tps": 53.4317409101902
                 },
                 {
                     "prompt": "Compose a short poem about the moon.",
                     "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
                     "acceptance_rate": 0.5,
-                    "tps": 93.44195774834948
+                    "tps": 43.27889640383851
                 },
                 {
                     "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
                     "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
                     "acceptance_rate": 1.0,
-                    "tps": 122.56706766605329
+                    "tps": 57.484423393763834
                 }
             ]
         },
         "naive": {
-            "medusa_tps": 102.12845183412654,
-            "speedup": 1.4180520596593802,
-            "avg_acceptance_rate": 1.5804508196721312,
+            "medusa_tps": 49.066522351385615,
+            "speedup": 1.4587121704880472,
+            "avg_acceptance_rate": 1.5592913993822761,
             "results": [
                 {
                     "prompt": "Write a Python script to sort a list.",
                     "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
                     "acceptance_rate": 1.8444444444444446,
-                    "tps": 114.22367577728181
+                    "tps": 54.745694001171884
                 },
                 {
                     "prompt": "Explain the theory of relativity in simple terms.",
                     "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
                     "acceptance_rate": 1.3888888888888888,
-                    "tps": 95.7204733608561
+                    "tps": 44.336328663186066
                 },
                 {
                     "prompt": "What are the benefits of eating healthy?",
-                    "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
-                    "acceptance_rate": 1.8666666666666667,
-                    "tps": 111.12534740713069
+                    "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your overall physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of de",
+                    "acceptance_rate": 1.7608695652173914,
+                    "tps": 52.766298190064106
                 },
                 {
                     "prompt": "Compose a short poem about the moon.",
                     "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
                     "acceptance_rate": 1.1147540983606556,
-                    "tps": 85.43895268167076
+                    "tps": 41.175378905041754
                 },
                 {
                     "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
                     "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
                     "acceptance_rate": 1.6875,
-                    "tps": 104.1338099436933
+                    "tps": 52.30891199746427
                 }
             ]
         },
         "optimized": {
-            "medusa_tps": 136.81407941357583,
-            "speedup": 1.899661491177078,
+            "medusa_tps": 64.87512150383286,
+            "speedup": 1.9286903730779565,
             "avg_acceptance_rate": 1.5397163699113656,
             "results": [
                 {
                     "prompt": "Write a Python script to sort a list.",
                     "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
                     "acceptance_rate": 1.9090909090909092,
-                    "tps": 154.7227253996927
+                    "tps": 74.031469844227
                 },
                 {
                     "prompt": "Explain the theory of relativity in simple terms.",
-                    "generated_text": "The theory of relativity is a scientific theory that explains how objects move and interact with each other in a way that is consistent with the principles of physics. It is based on the principle of relativity, which states that the laws of physics are the same for all observers, regardless of their location or velocity.\n\nThe theory of relativity is based on the idea that all objects in the universe are moving at the same speed, regardless of their mass or size. This means that objects that are moving at the same speed will appear to move at the same speed to an observer who is moving at the same speed.\n\nThe",
+                    "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
                     "acceptance_rate": 1.2280701754385965,
-                    "tps": 121.81194293655521
+                    "tps": 55.02422385915659
                 },
                 {
                     "prompt": "What are the benefits of eating healthy?",
                     "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
                     "acceptance_rate": 1.8666666666666667,
-                    "tps": 156.76161036284685
+                    "tps": 73.87248307872102
                 },
                 {
                     "prompt": "Compose a short poem about the moon.",
                     "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
                     "acceptance_rate": 1.1147540983606556,
-                    "tps": 115.89819586697564
+                    "tps": 54.91993110980239
                 },
                 {
                     "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
                     "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
                     "acceptance_rate": 1.58,
-                    "tps": 134.87592250180882
+                    "tps": 66.52749962725728
                 }
             ]
         }
