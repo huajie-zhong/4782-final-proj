@@ -1,83 +1,81 @@
 {
     "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
     "design": "paper",
-    "greedy_tps": 71.45473578107496,
-    "medusa_tps": 140.29280597490512,
-    "speedup_ratio": 1.9633800956837653,
+    "greedy_tps": 33.39265561270874,
+    "medusa_tps": 67.15651221928553,
+    "speedup_ratio": 2.011116246583479,
     "avg_acceptance_rate": 1.5397163699113656,
+    "medusa_typical_tps": 72.07339212060121,
+    "speedup_ratio_typical": 2.158360597507291,
+    "avg_acceptance_rate_typical": 1.923159611535325,
     "head_accuracies": {
-        "head_0": 0.4015748031496063,
-        "head_1": 0.2540983606557377,
-        "head_2": 0.23076923076923078,
-        "head_3": 0.20535714285714285
+        "head_0": 0.5206349206349207,
+        "head_1": 0.3774193548387097,
+        "head_2": 0.28852459016393445,
+        "head_3": 0.23666666666666666
     },
     "greedy_results": [
         {
             "prompt": "Write a Python script to sort a list.",
             "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
-            "tps": 71.02341730178676,
-            "total_time": 1.802222490310669,
-            "generated_tokens": 128
+            "acceptance_rate": 1.9090909090909092,
+            "tps": 76.51242894287417
         },
         {
             "prompt": "Explain the theory of relativity in simple terms.",
             "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
-            "tps": 72.52669907962158,
-            "total_time": 1.7648673057556152,
-            "generated_tokens": 128
-        },
-        {
-            "prompt": "What are the benefits of eating healthy?",
-            "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
-            "tps": 71.9947421814288,
-            "total_time": 1.7779076099395752,
-            "generated_tokens": 128
-        },
-        {
-            "prompt": "Compose a short poem about the moon.",
-            "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
-            "tps": 70.20111794374506,
-            "total_time": 1.8233327865600586,
-            "generated_tokens": 128
-        },
-        {
-            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
-            "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
-            "tps": 71.52770239879261,
-            "total_time": 1.7895164489746094,
-            "generated_tokens": 128
-        }
-    ],
-    "medusa_results": [
-        {
-            "prompt": "Write a Python script to sort a list.",
-            "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
-            "acceptance_rate": 1.9090909090909092,
-            "tps": 163.1364050939459
-        },
-        {
-            "prompt": "Explain the theory of relativity in simple terms.",
-            "generated_text": "The theory of relativity is a scientific theory that explains how objects move and interact with each other in a way that is consistent with the principles of physics. It is based on the principle of relativity, which states that the laws of physics are the same for all observers, regardless of their location or velocity.\n\nThe theory of relativity is based on the idea that all objects in the universe are moving at the same speed, regardless of their mass or size. This means that objects that are moving at the same speed will appear to move at the same speed to an observer who is moving at the same speed.\n\nThe",
             "acceptance_rate": 1.2280701754385965,
-            "tps": 124.15091964301612
+            "tps": 58.895529094585484
         },
         {
             "prompt": "What are the benefits of eating healthy?",
             "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
             "acceptance_rate": 1.8666666666666667,
-            "tps": 161.71083967165487
+            "tps": 75.99782178226101
         },
         {
             "prompt": "Compose a short poem about the moon.",
             "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
             "acceptance_rate": 1.1147540983606556,
-            "tps": 115.49035256719822
+            "tps": 56.254245560944334
         },
         {
             "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
             "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
             "acceptance_rate": 1.58,
-            "tps": 136.9755128987105
+            "tps": 68.12253571576264
+        }
+    ],
+    "typical_results": [
+        {
+            "prompt": "Write a Python script to sort a list.",
+            "generated_text": "Here is a Python script that sorts a list using the `sort()` method:\n\n```python\nimport random\n\ndef random_int(min, max):\n    \"\"\"\n    Returns a random integer between min and max.\n\n    Args:\n        min: The minimum integer.\n        max: The maximum integer.\n\n    Returns:\n        A random integer between min and max.\n    \"\"\"\n    return random.randint(min, max)\n\n\ndef main():\n    # Generate list of random numbers\n    num_list = []\n    for I in range",
+            "acceptance_rate": 2.0,
+            "tps": 73.05043091298248
+        },
+        {
+            "prompt": "Explain the theory of relativity in simple terms.",
+            "generated_text": "The theory of relativity is a scientific framework that explains the fundamental principles of nature based on the principle of relativity. It states that the laws of physics and the laws of the universe are not the same for all observers and regardless of the observer's motion.\n\nThe relativity of time, space, and mass, also known as the principle of relativity, states that the speed of light and the time it takes to travel a distance, c, are equal in all directions. This means that the same time and distance in a space-time continuum, the universe, is measured to be equal, regardless of the",
+            "acceptance_rate": 1.7446808510638299,
+            "tps": 67.88534704338174
+        },
+        {
+            "prompt": "What are the benefits of eating healthy?",
+            "generated_text": "Here are some of the benefits of eating healthy:\n\n1. Improved health: Eating a healthy diet can help to improve your overall health and well-being.\n\n2. Improved energy: A balanced diet can help you to feel more energized, and can also boost your metabolism.\n\n3. Improved mood and cognitive function: A balanced diet that includes plenty of fruits, vegetables, whole grains, lean proteins, and healthy fats can help to improve your mood and cognitive function.\n",
+            "acceptance_rate": 2.0714285714285716,
+            "tps": 74.88236292612505
+        },
+        {
+            "prompt": "Compose a short poem about the moon.",
+            "generated_text": "The night moon, shining through,\nA gentle presence, of peace,\nA spirit of the night,\nA beacon of hope for the day.\n\nThe moon, a soothing,\nSilent, yet so, so,\nMysterious, and, yet so,\nA sacred, of, so, and, so,\n\nA moon of, so, and,\nSo, of, so, and,\nA sacred, of, so,\nA moon of, so, and,\n\nA sacred, of, so,\nA moon of, so,\nA",
+            "acceptance_rate": 2.097560975609756,
+            "tps": 76.79731576764786
+        },
+        {
+            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+            "generated_text": "Ingredients:\n\nFor the dough:\n\n- 1 cup unsalted butter, at room temperature\n- 1/2 cup granulated sugar\n- 1/2 cup unsweetened cocoa powder\n- 1/2 cup granulated sugar\n- 1/2 teaspoon baking soda\n- 1 teaspoon salt\n- 1/2 cup unsalted butter, melted\n- 1/2 cup milk\n- 1/2 cup unsweetened applesauce (or canola",
+            "acceptance_rate": 1.702127659574468,
+            "tps": 67.75150395286894
         }
     ]
 }

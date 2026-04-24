@@ -82,13 +82,14 @@ def plot_speedup_comparison(benchmarks):
     for _, d in benchmarks.items():
         labels.append(_short(d.get("model", "?")))
         greedy.append(d.get("greedy_tps", 0.0))
-        medusa.append(d.get("medusa_tps", 0.0))
-        speedups.append(d.get("speedup_ratio", 0.0))
+        # Prefer typical acceptance (paper-comparable); fall back to greedy acceptance.
+        medusa.append(d.get("medusa_typical_tps", d.get("medusa_tps", 0.0)))
+        speedups.append(d.get("speedup_ratio_typical", d.get("speedup_ratio", 0.0)))
     x = np.arange(len(labels))
     w = 0.35
     fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.bar(x - w / 2, greedy, w, label="Greedy", color="#888")
-    ax.bar(x + w / 2, medusa, w, label="Medusa", color="#4c72b0")
+    ax.bar(x - w / 2, greedy, w, label="Greedy baseline", color="#888")
+    ax.bar(x + w / 2, medusa, w, label="Medusa (typical accept)", color="#4c72b0")
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.set_ylabel("Tokens / second")
@@ -112,7 +113,9 @@ def plot_acceptance_histogram(benchmarks):
     n = len(benchmarks)
     fig, axes = plt.subplots(1, n, figsize=(5 * n, 4), squeeze=False)
     for ax, (_, d) in zip(axes[0], benchmarks.items()):
-        rates = [r.get("acceptance_rate", 0.0) for r in d.get("medusa_results", [])]
+        # Prefer typical_results (paper-comparable); fall back to greedy_results / legacy key.
+        result_list = d.get("typical_results", d.get("greedy_results", d.get("medusa_results", [])))
+        rates = [r.get("acceptance_rate", 0.0) for r in result_list]
         model = _short(d.get("model", "?"))
         if not rates:
             ax.set_title(f"{model} (no data)")
