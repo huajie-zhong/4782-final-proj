@@ -1,0 +1,156 @@
+{
+    "model": "lmsys/vicuna-7b-v1.5",
+    "acceptance": "greedy",
+    "design": "paper",
+    "greedy_tps": 51.96957799643462,
+    "greedy_results": [
+        {
+            "prompt": "Write a Python script to sort a list.",
+            "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+            "tps": 52.99469432082075,
+            "total_time": 2.4153361320495605,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Explain the theory of relativity in simple terms.",
+            "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+            "tps": 51.7254650100518,
+            "total_time": 2.4746031761169434,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "What are the benefits of eating healthy?",
+            "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+            "tps": 51.79764883324856,
+            "total_time": 2.3553192615509033,
+            "generated_tokens": 122
+        },
+        {
+            "prompt": "Compose a short poem about the moon.",
+            "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nThrough the darkness it shines,\nA beacon of hope and light,\nA symbol of the divine.\n\nIn its phases, it changes,\nFrom new to full and back again,\nA reminder of time's passage.\n\nThe moon, a celestial beauty,\nA source of wonder and awe,\nA constant",
+            "tps": 51.971702783584455,
+            "total_time": 2.462878704071045,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+            "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+            "tps": 51.35837903446756,
+            "total_time": 2.492290496826172,
+            "generated_tokens": 128
+        }
+    ],
+    "rows": {
+        "none": {
+            "medusa_tps": 86.0614973013245,
+            "speedup": 1.6559976166677504,
+            "avg_acceptance_rate": 0.8884413395326376,
+            "results": [
+                {
+                    "prompt": "Write a Python script to sort a list.",
+                    "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+                    "acceptance_rate": 1.098360655737705,
+                    "tps": 90.54001294181255
+                },
+                {
+                    "prompt": "Explain the theory of relativity in simple terms.",
+                    "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+                    "acceptance_rate": 0.6075949367088608,
+                    "tps": 71.30412224969855
+                },
+                {
+                    "prompt": "What are the benefits of eating healthy?",
+                    "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                    "acceptance_rate": 0.8615384615384616,
+                    "tps": 84.85834800001128
+                },
+                {
+                    "prompt": "Compose a short poem about the moon.",
+                    "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+                    "acceptance_rate": 0.6333333333333333,
+                    "tps": 76.43966733962826
+                },
+                {
+                    "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                    "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+                    "acceptance_rate": 1.2413793103448276,
+                    "tps": 107.1653359754718
+                }
+            ]
+        },
+        "naive": {
+            "medusa_tps": 84.10534059094452,
+            "speedup": 1.6183571972955904,
+            "avg_acceptance_rate": 1.6273962455315325,
+            "results": [
+                {
+                    "prompt": "Write a Python script to sort a list.",
+                    "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+                    "acceptance_rate": 2.0476190476190474,
+                    "tps": 100.18331076857444
+                },
+                {
+                    "prompt": "Explain the theory of relativity in simple terms.",
+                    "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+                    "acceptance_rate": 1.3962264150943395,
+                    "tps": 77.10992486796957
+                },
+                {
+                    "prompt": "What are the benefits of eating healthy?",
+                    "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                    "acceptance_rate": 1.5416666666666667,
+                    "tps": 80.07953225379623
+                },
+                {
+                    "prompt": "Compose a short poem about the moon.",
+                    "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+                    "acceptance_rate": 1.127659574468085,
+                    "tps": 67.8785964228598
+                },
+                {
+                    "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                    "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+                    "acceptance_rate": 2.0238095238095237,
+                    "tps": 95.2753386415226
+                }
+            ]
+        },
+        "optimized": {
+            "medusa_tps": 108.6581566541059,
+            "speedup": 2.0908031360493324,
+            "avg_acceptance_rate": 1.5893098761703413,
+            "results": [
+                {
+                    "prompt": "Write a Python script to sort a list.",
+                    "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+                    "acceptance_rate": 1.9767441860465116,
+                    "tps": 122.17729740715023
+                },
+                {
+                    "prompt": "Explain the theory of relativity in simple terms.",
+                    "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+                    "acceptance_rate": 1.309090909090909,
+                    "tps": 96.34594392825257
+                },
+                {
+                    "prompt": "What are the benefits of eating healthy?",
+                    "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                    "acceptance_rate": 1.5416666666666667,
+                    "tps": 107.97962735687408
+                },
+                {
+                    "prompt": "Compose a short poem about the moon.",
+                    "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+                    "acceptance_rate": 1.0,
+                    "tps": 84.58903177183026
+                },
+                {
+                    "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                    "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+                    "acceptance_rate": 2.119047619047619,
+                    "tps": 132.19888280642235
+                }
+            ]
+        }
+    }
+}

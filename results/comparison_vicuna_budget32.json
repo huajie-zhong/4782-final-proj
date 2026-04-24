@@ -1,0 +1,78 @@
+{
+    "greedy_acceptance": {
+        "avg_acceptance_rate": 1.4875987607164078,
+        "avg_tps": 106.06684676633986,
+        "results": [
+            {
+                "prompt": "Write a Python script to sort a list.",
+                "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+                "acceptance_rate": 1.9090909090909092,
+                "tps": 123.96554310754468
+            },
+            {
+                "prompt": "Explain the theory of relativity in simple terms.",
+                "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+                "acceptance_rate": 1.2678571428571428,
+                "tps": 98.06070960785829
+            },
+            {
+                "prompt": "What are the benefits of eating healthy?",
+                "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                "acceptance_rate": 1.392156862745098,
+                "tps": 102.89661817952215
+            },
+            {
+                "prompt": "Compose a short poem about the moon.",
+                "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+                "acceptance_rate": 0.98,
+                "tps": 84.03807856917774
+            },
+            {
+                "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+                "acceptance_rate": 1.8888888888888888,
+                "tps": 121.37328436759647
+            }
+        ]
+    },
+    "typical_acceptance": {
+        "avg_acceptance_rate": 1.770971145813251,
+        "avg_tps": 116.28990991045828,
+        "results": [
+            {
+                "prompt": "Write a Python script to sort a list.",
+                "generated_text": "Here is a simple Python script that sorts a list of integers in ascending order:\n```python\ndef sort_list(list):\n    # sort the list in ascending order\n    return list.sort()\n\n# create a list of integers\nmy_list = [1, 3, 4, 5, 2]\n\n# sort the list\nsorted_list = sort_list(my_list)\n\n# print the sorted list\nprint(sorted_list)\n```\nThis will output:\n```\n[1, 2, 3, 4,",
+                "acceptance_rate": 2.3684210526315788,
+                "tps": 141.32959077085346
+            },
+            {
+                "prompt": "Explain the theory of relativity in simple terms.",
+                "generated_text": "The theory of relativity is a scientific concept that explains how gravity and the speed of light are related. It was developed by Albert Einstein and is a fundamental principle in physics that explains how the universe works.\n\nThe theory states that the laws of physics are the same for all observers in uniform motion relative to one another. This means that if you are moving at a constant speed, the laws of physics that govern how objects move and interact with each other will be the same as if you were standing still.\n\nOne of the key implications of the theory of relativity is that the speed of light is always constant,",
+                "acceptance_rate": 1.3888888888888888,
+                "tps": 99.74001647762277
+            },
+            {
+                "prompt": "What are the benefits of eating healthy?",
+                "generated_text": "Eating a healthy diet provides numerous benefits for your overall health and wellbeing. Some of the key benefits include:\n\n1. Maintaining a healthy weight: Consuming a balanced diet with a variety of nutrients can help you maintain a healthy weight and reduce your risk of obesity and associated health problems.\n2. Improving digestion: Eating a diet rich in fruits, vegetables, whole grains, and lean protein can help improve digestion and reduce the risk of digestive issues such as constipation, diarrhea, and",
+                "acceptance_rate": 1.56,
+                "tps": 108.65773584973864
+            },
+            {
+                "prompt": "Compose a short poem about the moon.",
+                "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon is a guiding light.\n\nIt rises in the east,\nA beacon in the dark,\nA symbol of hope and light.\n\nIt watches as the world turns,\nA constant in the night,\nA reminder of the beauty\n\nIn the world around us.\n\nSo let us take a moment,\nTo appreciate the moon,\nAnd all the beauty it brings.\n\nTo the world, it's a symbol,\nOf love, and hope, and truth,",
+                "acceptance_rate": 1.4423076923076923,
+                "tps": 102.00080062332344
+            },
+            {
+                "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 3/4 cup brown sugar\n* 1/2 cup granulated sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups chocolate chips\n\nInstructions:\n\n1. Preheat",
+                "acceptance_rate": 2.0952380952380953,
+                "tps": 129.72140583075304
+            }
+        ]
+    },
+    "selected_tree_budget": 32,
+    "tree_mode": "optimized",
+    "model_id": "lmsys/vicuna-7b-v1.5",
+    "design": "paper"
+}

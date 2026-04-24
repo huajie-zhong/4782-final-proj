@@ -1,0 +1,83 @@
+{
+    "model": "lmsys/vicuna-7b-v1.5",
+    "design": "paper",
+    "greedy_tps": 51.69828720212904,
+    "medusa_tps": 105.8111605701528,
+    "speedup_ratio": 2.0467053416383836,
+    "avg_acceptance_rate": 1.5893098761703413,
+    "head_accuracies": {
+        "head_0": 0.2033195020746888,
+        "head_1": 0.1016949152542373,
+        "head_2": 0.12121212121212122,
+        "head_3": 0.048672566371681415
+    },
+    "greedy_results": [
+        {
+            "prompt": "Write a Python script to sort a list.",
+            "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+            "tps": 51.98906088569408,
+            "total_time": 2.4620563983917236,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Explain the theory of relativity in simple terms.",
+            "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+            "tps": 50.52511815085929,
+            "total_time": 2.533393383026123,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "What are the benefits of eating healthy?",
+            "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+            "tps": 52.13454961067076,
+            "total_time": 2.3400988578796387,
+            "generated_tokens": 122
+        },
+        {
+            "prompt": "Compose a short poem about the moon.",
+            "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nThrough the darkness it shines,\nA beacon of hope and light,\nA symbol of the divine.\n\nIn its phases, it changes,\nFrom new to full and back again,\nA reminder of time's passage.\n\nThe moon, a celestial beauty,\nA source of wonder and awe,\nA constant",
+            "tps": 52.62829412742678,
+            "total_time": 2.4321517944335938,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+            "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+            "tps": 51.214413235994286,
+            "total_time": 2.4992964267730713,
+            "generated_tokens": 128
+        }
+    ],
+    "medusa_results": [
+        {
+            "prompt": "Write a Python script to sort a list.",
+            "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+            "acceptance_rate": 1.9767441860465116,
+            "tps": 119.29144922302343
+        },
+        {
+            "prompt": "Explain the theory of relativity in simple terms.",
+            "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+            "acceptance_rate": 1.309090909090909,
+            "tps": 98.04407309819986
+        },
+        {
+            "prompt": "What are the benefits of eating healthy?",
+            "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+            "acceptance_rate": 1.5416666666666667,
+            "tps": 102.40200823610543
+        },
+        {
+            "prompt": "Compose a short poem about the moon.",
+            "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+            "acceptance_rate": 1.0,
+            "tps": 80.78209271317058
+        },
+        {
+            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+            "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+            "acceptance_rate": 2.119047619047619,
+            "tps": 128.53617958026464
+        }
+    ]
+}

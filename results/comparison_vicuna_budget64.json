@@ -1,0 +1,78 @@
+{
+    "greedy_acceptance": {
+        "avg_acceptance_rate": 1.5893098761703413,
+        "avg_tps": 104.42139319827368,
+        "results": [
+            {
+                "prompt": "Write a Python script to sort a list.",
+                "generated_text": "Here is a simple Python script to sort a list:\n```python\ndef sort_list(my_list):\n    # sort the list in ascending order\n    my_list.sort()\n    # sort the list in descending order\n    # my_list.reverse()\n    # sort the list using a lambda function\n    # my_list.sort(key=lambda x: x[1])\n    return my_list\n\n# test the function\nmy_list = [3, 1, 4, 1, 5, 9, 2, ",
+                "acceptance_rate": 1.9767441860465116,
+                "tps": 122.42047836427943
+            },
+            {
+                "prompt": "Explain the theory of relativity in simple terms.",
+                "generated_text": "The theory of relativity is a scientific concept that explains how gravity works. It was developed by Albert Einstein in the early 20th century and has since been widely accepted as one of the most important theories in physics.\n\nIn simple terms, the theory of relativity says that gravity is not a force that acts between objects, but rather a curvature of spacetime caused by the presence of mass. This means that the path that an object takes through spacetime is determined by its mass and velocity, and that the laws of physics are the same for all observers in uniform motion relative to one another.\n\nThis",
+                "acceptance_rate": 1.309090909090909,
+                "tps": 93.65068582042376
+            },
+            {
+                "prompt": "What are the benefits of eating healthy?",
+                "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                "acceptance_rate": 1.5416666666666667,
+                "tps": 103.31999521869619
+            },
+            {
+                "prompt": "Compose a short poem about the moon.",
+                "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon, a guiding light.\n\nRising in the east,\nIt casts its soft, white light,\nOn the world below.\n\nA symbol of hope,\nA beacon in the dark,\nThe moon, a shining light.\n\nA mystery, a wonder,\nA source of inspiration,\nThe moon, a guiding light.",
+                "acceptance_rate": 1.0,
+                "tps": 78.43519476568109
+            },
+            {
+                "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                "generated_text": "Sure, here's a recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 1/2 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstructions:\n\n1",
+                "acceptance_rate": 2.119047619047619,
+                "tps": 124.2806118222879
+            }
+        ]
+    },
+    "typical_acceptance": {
+        "avg_acceptance_rate": 1.9272175060711647,
+        "avg_tps": 117.33124418015291,
+        "results": [
+            {
+                "prompt": "Write a Python script to sort a list.",
+                "generated_text": "Here is a simple Python script that sorts a list in ascending order:\n```python\nmy_list = [1, 3, 2, 4, 5, 6]\n\n# sort the list in ascending order\nmy_list.sort()\n\n# print the sorted list\nprint(my_list)\n```\nThis will output:\n```\n[1, 2, 3, 4, 5, 6]\n```\nYou can also use the `sorted()` function to sort a list in Python, like this:\n```python\nmy_",
+                "acceptance_rate": 2.878787878787879,
+                "tps": 153.80866972673968
+            },
+            {
+                "prompt": "Explain the theory of relativity in simple terms.",
+                "generated_text": "The theory of relativity is a scientific concept that explains how the laws of physics work the same way in different reference frames.\n\nIn simpler terms, it means that the laws of physics don't change, but the way we perceive them does based on our frame of reference. This theory was developed by Albert Einstein, and it has had a huge impact on our understanding of the universe.\n\nThe theory of relativity is based on two main concepts:\n\n1. The laws of physics are the same for all observers in uniform motion relative to one another.\n2. The speed of light is always constant",
+                "acceptance_rate": 1.56,
+                "tps": 102.66744084905038
+            },
+            {
+                "prompt": "What are the benefits of eating healthy?",
+                "generated_text": "Eating a healthy diet offers numerous benefits for overall health and wellness, including:\n\n1. Maintaining a healthy weight\n2. Reducing the risk of chronic diseases such as heart disease, type 2 diabetes, and certain cancers\n3. Improving energy levels and physical performance\n4. Supporting healthy digestion and regularity\n5. Promoting mental health and cognitive function\n6. Strengthening the immune system\n7. Aiding in the prevention of nutrient deficiencies.",
+                "acceptance_rate": 1.5416666666666667,
+                "tps": 100.9731743957308
+            },
+            {
+                "prompt": "Compose a short poem about the moon.",
+                "generated_text": "Silent, luminous,\nGlowing in the dark of night,\nThe moon is a guiding light.\n\nIt rises in the east,\nIt shines across the land,\nAnd casts its shadow, too.\n\nIt's a symbol of hope,\nA light in the dark,\nA beacon of light.\n\nSo here's to the moon,\nA shining, silvery sphere,\nA source of inspiration.",
+                "acceptance_rate": 1.5365853658536586,
+                "tps": 103.33893988228284
+            },
+            {
+                "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+                "generated_text": "Sure, here's a step-by-step recipe for chocolate chip cookies:\n\nIngredients:\n\n* 2 1/4 cups all-purpose flour\n* 1 tsp baking soda\n* 1 tsp salt\n* 1 cup unsalted butter, at room temperature\n* 3/4 cup white granulated sugar\n* 1/2 cup brown sugar\n* 2 large eggs\n* 2 tsp vanilla extract\n* 2 cups semisweet chocolate chips\n\nInstru",
+                "acceptance_rate": 2.119047619047619,
+                "tps": 125.86799604696087
+            }
+        ]
+    },
+    "selected_tree_budget": 64,
+    "tree_mode": "optimized",
+    "model_id": "lmsys/vicuna-7b-v1.5",
+    "design": "paper"
+}
