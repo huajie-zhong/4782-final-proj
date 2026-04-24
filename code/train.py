@@ -61,7 +61,12 @@ def train(args):
 
     # 2. Data loading
     print("Preparing data...")
-    tokenized_data = download_and_preprocess(tokenizer, max_samples=args.max_samples, max_length=args.max_length)
+    tokenized_data = download_and_preprocess(
+        tokenizer,
+        max_samples=args.max_samples,
+        max_length=args.max_length,
+        model_name=args.model_name,
+    )
     dataset = MedusaDataset(tokenized_data, max_length=args.max_length, pad_token_id=tokenizer.pad_token_id)
 
     # Split train/val
@@ -113,6 +118,8 @@ def train(args):
         for step, batch in enumerate(train_loader):
             input_ids = batch["input_ids"].to(device, non_blocking=True)
             attention_mask = batch["attention_mask"].to(device, non_blocking=True)
+            # AND of attention (drops padding) and loss_mask (assistant-only).
+            loss_mask = (batch["loss_mask"].to(device, non_blocking=True) & attention_mask)
 
             # Skip original_logits — it's unused during training and costs a full
             # (B, T, vocab) matmul through the backbone's LM head per step.
@@ -129,7 +136,7 @@ def train(args):
 
                     logits_k = head_logits[k][:, :-shift, :].contiguous().view(-1, head_logits[k].size(-1))
                     targets_k = input_ids[:, shift:].contiguous().view(-1)
-                    mask_k = attention_mask[:, shift:].contiguous().view(-1)
+                    mask_k = loss_mask[:, shift:].contiguous().view(-1)
 
                     valid_indices = mask_k == 1
                     logits_k = logits_k[valid_indices]
@@ -175,6 +182,7 @@ def train(args):
             for batch in val_loader:
                 input_ids = batch["input_ids"].to(device, non_blocking=True)
                 attention_mask = batch["attention_mask"].to(device, non_blocking=True)
+                loss_mask = (batch["loss_mask"].to(device, non_blocking=True) & attention_mask)
 
                 _, head_logits = model(
                     input_ids, attention_mask=attention_mask, compute_original_logits=False
@@ -184,7 +192,7 @@ def train(args):
                     shift = k + 2
                     logits_k = head_logits[k][:, :-shift, :].contiguous().view(-1, head_logits[k].size(-1))
                     targets_k = input_ids[:, shift:].contiguous().view(-1)
-                    mask_k = attention_mask[:, shift:].contiguous().view(-1)
+                    mask_k = loss_mask[:, shift:].contiguous().view(-1)
 
                     valid_indices = mask_k == 1
                     logits_k = logits_k[valid_indices]

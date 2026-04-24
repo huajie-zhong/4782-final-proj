@@ -3,16 +3,161 @@ data_utils.py
 
 Handles downloading, preprocessing, and tokenizing the ShareGPT data.
 Contains the MedusaDataset class for data loading.
+
+Each conversation is rendered with the model's chat template (Vicuna for
+vicuna-* backbones, otherwise tokenizer.apply_chat_template) so that the
+training-time hidden-state distribution matches what the heads see at
+inference. A per-token `loss_mask` keeps loss restricted to assistant tokens
+(paper §2.2.1).
 """
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-def download_and_preprocess(tokenizer, max_samples=None, max_length=2048):
+VICUNA_SYSTEM = (
+    "A chat between a curious user and an artificial intelligence assistant. "
+    "The assistant gives helpful, detailed, and polite answers to the user's questions."
+)
+
+
+def _extract_turns(item):
+    """Normalize a ShareGPT/lmsys item into a [(role, content), ...] list."""
+    turns = []
+    if "conversations" in item:
+        for t in item["conversations"]:
+            sender = t.get("from")
+            if sender == "human":
+                role = "user"
+            elif sender == "gpt":
+                role = "assistant"
+            else:
+                continue
+            content = (t.get("value") or "").strip()
+            if content:
+                turns.append((role, content))
+    elif "conversation_a" in item:
+        for t in item["conversation_a"]:
+            role = t.get("role")
+            if role in ("user", "assistant"):
+                content = (t.get("content") or "").strip()
+                if content:
+                    turns.append((role, content))
+    return turns
+
+
+def _build_vicuna_conversation(turns, tokenizer, max_length, model_name=None):
+    """Vicuna template via FastChat (matches the official MEDUSA repo's
+    `medusa/train/train_legacy.py`, which uses
+    `fastchat.model.model_adapter.get_conversation_template`).
+
+    Returns (input_ids, loss_mask) as Python int lists, truncated to max_length.
+    loss_mask=1 only on assistant tokens (and trailing separator).
+
+    Falls back to a hand-rolled Vicuna template if fschat isn't importable.
     """
-    Downloads and preprocesses ShareGPT dataset.
-    Filters for assistant-turn text only and concatenates multi-turn responses.
-    Truncates at tokenization time to max_length so no oversized tensors are stored.
+    try:
+        from fastchat.model.model_adapter import get_conversation_template
+    except ImportError:
+        return _build_vicuna_conversation_manual(turns, tokenizer, max_length)
+
+    conv = get_conversation_template(model_name or "vicuna")
+    user_role, asst_role = conv.roles  # ("USER", "ASSISTANT")
+
+    ids, loss = [], []
+    for role, content in turns:
+        conv.append_message(user_role if role == "user" else asst_role, content)
+        full_text = conv.get_prompt()
+        new_ids = tokenizer(full_text, add_special_tokens=True).input_ids
+        delta = new_ids[len(ids):]
+        mask_value = 1 if role == "assistant" else 0
+        ids.extend(delta)
+        loss.extend([mask_value] * len(delta))
+        if len(ids) >= max_length:
+            break
+
+    return ids[:max_length], loss[:max_length]
+
+
+def _build_vicuna_conversation_manual(turns, tokenizer, max_length):
+    """Fallback when fschat isn't installed. Same template structure."""
+    eos_id = tokenizer.eos_token_id
+    sys_ids = tokenizer(VICUNA_SYSTEM, add_special_tokens=True).input_ids
+    ids = list(sys_ids)
+    loss = [0] * len(ids)
+
+    for role, content in turns:
+        if role == "user":
+            seg = tokenizer(f" USER: {content} ASSISTANT:", add_special_tokens=False).input_ids
+            ids.extend(seg)
+            loss.extend([0] * len(seg))
+        else:
+            seg = tokenizer(f" {content}", add_special_tokens=False).input_ids
+            ids.extend(seg)
+            loss.extend([1] * len(seg))
+            if eos_id is not None:
+                ids.append(eos_id)
+                loss.append(1)
+        if len(ids) >= max_length:
+            break
+
+    return ids[:max_length], loss[:max_length]
+
+
+def _build_chat_template_conversation(turns, tokenizer, max_length):
+    """Generic path for models with a registered tokenizer.chat_template
+    (e.g. TinyLlama-Chat). Tokenize prefix-by-prefix so we can mark assistant
+    tokens with loss=1 and user/system tokens with loss=0.
+    """
+    messages = []
+    ids, loss = [], []
+    prev_len = 0
+
+    for role, content in turns:
+        messages.append({"role": role, "content": content})
+        try:
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False,
+            )
+        except Exception:
+            return None, None
+        new_ids = tokenizer(text, add_special_tokens=False).input_ids
+        delta = new_ids[prev_len:]
+        mask_value = 1 if role == "assistant" else 0
+        ids.extend(delta)
+        loss.extend([mask_value] * len(delta))
+        prev_len = len(new_ids)
+        if len(ids) >= max_length:
+            break
+
+    return ids[:max_length], loss[:max_length]
+
+
+def _build_conversation(item, tokenizer, model_name, max_length):
+    turns = _extract_turns(item)
+    if not turns:
+        return None, None
+    mid = (model_name or "").lower()
+    if "vicuna" in mid:
+        return _build_vicuna_conversation(turns, tokenizer, max_length, model_name)
+    if getattr(tokenizer, "chat_template", None):
+        out = _build_chat_template_conversation(turns, tokenizer, max_length)
+        if out[0] is not None:
+            return out
+    # Fallback: assistant turns only, no template (legacy behavior).
+    text = "\n\n".join(c for r, c in turns if r == "assistant")
+    if not text:
+        return None, None
+    ids = tokenizer(text, truncation=True, max_length=max_length).input_ids
+    return ids, [1] * len(ids)
+
+
+def download_and_preprocess(tokenizer, max_samples=None, max_length=2048, model_name=None):
+    """
+    Downloads and preprocesses ShareGPT dataset using the model's chat template.
+
+    Returns a list of dicts with `input_ids`, `attention_mask`, and `loss_mask`
+    (all 1D long tensors). `loss_mask` marks assistant-only positions; the
+    training loop ANDs it with `attention_mask` when computing CE.
     """
     try:
         from datasets import load_dataset
@@ -21,7 +166,6 @@ def download_and_preprocess(tokenizer, max_samples=None, max_length=2048):
 
     print("Loading dataset...")
     try:
-        # Default ShareGPT dataset
         dataset = load_dataset("Aeala/ShareGPT_Vicuna_unfiltered", split="train")
     except Exception as e:
         print(f"Failed to load default dataset: {e}. Falling back to lmsys/chatbot_arena_conversations...")
@@ -30,47 +174,21 @@ def download_and_preprocess(tokenizer, max_samples=None, max_length=2048):
     if max_samples is not None:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
 
-    print("Preprocessing...")
-    processed_texts = []
-    
-    # Process each conversation
+    print(f"Preprocessing with chat template (model={model_name})...")
+    tokenized_data = []
+    skipped = 0
     for item in dataset:
-        assistant_turns = []
-        
-        # ShareGPT format
-        if "conversations" in item:
-            for turn in item["conversations"]:
-                if turn.get("from") == "gpt":
-                    assistant_turns.append(turn.get("value", ""))
-        # lmsys format fallback
-        elif "conversation_a" in item:
-            for turn in item["conversation_a"]:
-                if turn.get("role") == "assistant":
-                    assistant_turns.append(turn.get("content", ""))
-                    
-        if assistant_turns:
-            # Concatenate multi-turn responses with a separator
-            concatenated_text = "\n\n".join(assistant_turns)
-            processed_texts.append(concatenated_text)
+        ids, loss = _build_conversation(item, tokenizer, model_name, max_length)
+        if ids is None or len(ids) < 4:
+            skipped += 1
+            continue
+        tokenized_data.append({
+            "input_ids": torch.tensor(ids, dtype=torch.long),
+            "attention_mask": torch.ones(len(ids), dtype=torch.long),
+            "loss_mask": torch.tensor(loss, dtype=torch.long),
+        })
 
-    print(f"Tokenizing {len(processed_texts)} samples...")
-    # Batch tokenize: pass all texts at once — HuggingFace fast tokenizers run in Rust
-    # and parallelize internally, making this 10-50x faster than a per-sample loop.
-    # padding=False so MedusaDataset handles padding/truncation per-item as before.
-    batch_encoding = tokenizer(
-        processed_texts,
-        truncation=True,
-        max_length=max_length,
-        padding=False,
-        return_tensors=None,   # return Python lists; convert to tensors below
-    )
-    tokenized_data = [
-        {
-            "input_ids": torch.tensor(batch_encoding["input_ids"][i], dtype=torch.long).unsqueeze(0),
-            "attention_mask": torch.tensor(batch_encoding["attention_mask"][i], dtype=torch.long).unsqueeze(0),
-        }
-        for i in range(len(processed_texts))
-    ]
+    print(f"Kept {len(tokenized_data)} samples (skipped {skipped} empty/invalid).")
     return tokenized_data
 
 class MedusaDataset(Dataset):
@@ -89,25 +207,37 @@ class MedusaDataset(Dataset):
         
     def __getitem__(self, idx):
         item = self.data[idx]
-        input_ids = item["input_ids"].squeeze(0)
-        attention_mask = item["attention_mask"].squeeze(0)
-        
+        input_ids = item["input_ids"]
+        attention_mask = item["attention_mask"]
+        # Older preprocessed shards may not carry loss_mask; default to attention.
+        loss_mask = item.get("loss_mask", attention_mask)
+
+        # Tolerate both [seq] and [1, seq] storage shapes.
+        if input_ids.dim() == 2:
+            input_ids = input_ids.squeeze(0)
+            attention_mask = attention_mask.squeeze(0)
+            loss_mask = loss_mask.squeeze(0) if loss_mask.dim() == 2 else loss_mask
+
         seq_len = len(input_ids)
-        
+
         if seq_len > self.max_length:
             input_ids = input_ids[:self.max_length]
             attention_mask = attention_mask[:self.max_length]
+            loss_mask = loss_mask[:self.max_length]
         elif seq_len < self.max_length:
             pad_len = self.max_length - seq_len
             pad_ids = torch.full((pad_len,), self.pad_token_id, dtype=input_ids.dtype)
             pad_mask = torch.zeros((pad_len,), dtype=attention_mask.dtype)
-            
+            pad_loss = torch.zeros((pad_len,), dtype=loss_mask.dtype)
+
             input_ids = torch.cat([input_ids, pad_ids])
             attention_mask = torch.cat([attention_mask, pad_mask])
-            
+            loss_mask = torch.cat([loss_mask, pad_loss])
+
         return {
             "input_ids": input_ids.long(),
-            "attention_mask": attention_mask.long()
+            "attention_mask": attention_mask.long(),
+            "loss_mask": loss_mask.long(),
         }
 
 if __name__ == "__main__":
