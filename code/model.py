@@ -77,14 +77,22 @@ class MedusaModel(nn.Module):
         # Note: LlamaForCausalLM has .model, GPTNeoX has .gpt_neox, etc.
         base_model = getattr(self.backbone, "model", getattr(self.backbone, "transformer", self.backbone.base_model))
 
-        base_model_outputs = base_model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            return_dict=True,
-            **kwargs
-        )
+        # Backbone is frozen — run under no_grad so we don't store activations for a
+        # backward we never do. Head gradients are unaffected: the heads' own weights
+        # are leaves with requires_grad=True, so dL/dW_head is computed from the
+        # head's own forward intermediates (h enters as a constant input).
+        # Huge memory drop → enables much bigger batches.
+        backbone_frozen = not any(p.requires_grad for p in self.backbone.parameters())
+        backbone_ctx = torch.no_grad() if backbone_frozen else torch.enable_grad()
+        with backbone_ctx:
+            base_model_outputs = base_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                return_dict=True,
+                **kwargs
+            )
 
         # For Llama, last_hidden_state is already normalized by the final LayerNorm
         hidden_states = base_model_outputs.last_hidden_state
