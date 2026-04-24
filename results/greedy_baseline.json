@@ -1,0 +1,40 @@
+{
+    "average_tps": 67.92140912480241,
+    "results": [
+        {
+            "prompt": "Write a Python script to sort a list.",
+            "generated_text": "Here's a Python script that sorts a list:\n\n```python\n# Example list: [1, 2, 3, 4, 5]\nmy_list = [1, 2, 3, 4, 5]\n\n# Sort the list in ascending order\nsorted_list = sorted(my_list)\n\n# Print the sorted list\nprint(sorted_list)\n```\n\nThis script first defines a list `my_list` with elements `1`, `2`, `3`, `4`, and `5`. It then sorts the list",
+            "tps": 69.62957652184988,
+            "total_time": 1.83829927444458,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Explain the theory of relativity in simple terms.",
+            "generated_text": "The theory of relativity is a scientific theory that describes how the laws of physics are affected by the presence of an observer. It was proposed by Albert Einstein in 1905 and has since become one of the most important and influential theories in physics.\n\nThe theory states that all objects in the universe are moving at the same speed, regardless of their size or mass. This is known as the principle of relativity. It also states that time moves at the same speed for all observers, regardless of their location in space. This is known as the principle of relativity of motion.\n\nThe theory of",
+            "tps": 69.11759407788864,
+            "total_time": 1.8519163131713867,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "What are the benefits of eating healthy?",
+            "generated_text": "Here are some benefits of eating healthy:\n\n1. Improved physical health: Eating a healthy diet can help improve your physical health by reducing the risk of chronic diseases such as heart disease, diabetes, and cancer.\n\n2. Reduced risk of chronic diseases: A healthy diet can help reduce the risk of chronic diseases such as obesity, high blood pressure, and high cholesterol.\n\n3. Improved mental health: A healthy diet can also improve your mental health by reducing the risk of depression",
+            "tps": 65.58704773148632,
+            "total_time": 1.9516048431396484,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Compose a short poem about the moon.",
+            "generated_text": "The moon, a silent witness to our lives,\nA celestial sight that never fades,\nA beacon of hope, a symbol of peace,\nA constant presence, a constant light.\n\nA shimmering orb, a celestial sight,\nA sight that transcends time and space,\nA reminder of the beauty of the night,\nA symbol of the infinite, a mystery.\n\nThe moon, a celestial beauty,\nA sight that transcends our understanding,\nA reminder of the power of the night,\nA symbol of the mysteries of",
+            "tps": 66.1996694646143,
+            "total_time": 1.933544397354126,
+            "generated_tokens": 128
+        },
+        {
+            "prompt": "Give me a step-by-step recipe for chocolate chip cookies.",
+            "generated_text": "Ingredients:\n- 2 cups all-purpose flour\n- 1/2 teaspoon baking soda\n- 1/2 teaspoon salt\n- 1/2 cup unsalted butter, at room temperature\n- 3/4 cup granulated sugar\n- 3/4 cup brown sugar\n- 2 large eggs\n- 1 teaspoon vanilla extract\n- 1 cup semisweet chocolate chips\n\nInstructions:\n\n1. Preheat your oven to 350",
+            "tps": 69.07315782817285,
+            "total_time": 1.8531076908111572,
+            "generated_tokens": 128
+        }
+    ]
+}
