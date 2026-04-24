@@ -33,3 +33,16 @@ results/*
 *.bin
 models/
 checkpoint-*/
+
+# Latex
+*.aux
+*.log
+*.out
+*.nav
+*.snm
+*.toc
+*.vrb
+*.gz
+*.fdb_latexmk
+*.vrb
+*.fls
