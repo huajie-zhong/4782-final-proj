@@ -21,6 +21,9 @@ def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("high")
+
     # 1. Load tokenizer and model
     print(f"Loading base model: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)

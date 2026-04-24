@@ -47,17 +47,18 @@ def _extract_turns(item):
 
 def _build_vicuna_conversation(turns, tokenizer, max_length, model_name=None):
     """Vicuna template via FastChat (matches the official MEDUSA repo's
-    `medusa/train/train_legacy.py`, which uses
-    `fastchat.model.model_adapter.get_conversation_template`).
+    `medusa/train/train_legacy.py`).
 
-    Returns (input_ids, loss_mask) as Python int lists, truncated to max_length.
-    loss_mask=1 only on assistant tokens (and trailing separator).
+    Fast path: render the full Vicuna prompt turn-by-turn with
+    `conv.get_prompt()` (pure string concat — cheap), record the character span
+    added during each assistant turn, then tokenize the final prompt ONCE with
+    `return_offsets_mapping=True`. Tokens whose char span falls inside an
+    assistant span get loss=1 (matches the old delta-based semantics: assistant
+    content + trailing separator/</s> → mask=1).
 
-    Falls back to a hand-rolled Vicuna template if fschat isn't importable.
+    Falls back to a hand-rolled template if fschat isn't importable.
     """
     try:
-        # Lightweight FastChat import (pure-stdlib module) — works with
-        # `pip install --no-deps fschat`, avoiding fastapi/uvicorn conflicts.
         from fastchat.conversation import get_conv_template
     except ImportError:
         return _build_vicuna_conversation_manual(turns, tokenizer, max_length)
@@ -65,19 +66,51 @@ def _build_vicuna_conversation(turns, tokenizer, max_length, model_name=None):
     conv = get_conv_template("vicuna_v1.1")
     user_role, asst_role = conv.roles  # ("USER", "ASSISTANT")
 
-    ids, loss = [], []
+    # Record (char_start, char_end, is_assistant) for each turn.
+    assistant_spans = []
+    prev_text = conv.get_prompt()
+    prev_len = len(prev_text)
     for role, content in turns:
         conv.append_message(user_role if role == "user" else asst_role, content)
-        full_text = conv.get_prompt()
-        new_ids = tokenizer(full_text, add_special_tokens=True).input_ids
-        delta = new_ids[len(ids):]
-        mask_value = 1 if role == "assistant" else 0
-        ids.extend(delta)
-        loss.extend([mask_value] * len(delta))
-        if len(ids) >= max_length:
-            break
+        new_text = conv.get_prompt()
+        if role == "assistant":
+            assistant_spans.append((prev_len, len(new_text)))
+        prev_len = len(new_text)
 
-    return ids[:max_length], loss[:max_length]
+    full_text = new_text
+    enc = tokenizer(
+        full_text,
+        add_special_tokens=True,
+        return_offsets_mapping=True,
+        truncation=True,
+        max_length=max_length,
+    )
+    ids = enc["input_ids"]
+    offsets = enc["offset_mapping"]
+    loss = _mask_from_spans(offsets, assistant_spans)
+    return ids, loss
+
+
+def _mask_from_spans(offsets, assistant_spans):
+    """Turn a list of character spans into a per-token 0/1 mask using the
+    tokenizer's offset_mapping. A token is labeled 1 iff its char span overlaps
+    any assistant span.
+
+    Token offsets of (0, 0) are reserved by fast tokenizers for special tokens
+    (BOS/EOS inserted by the tokenizer); those are always labeled 0.
+    """
+    loss = [0] * len(offsets)
+    if not assistant_spans:
+        return loss
+    for i, (ts, te) in enumerate(offsets):
+        if ts == te:
+            continue
+        for a_start, a_end in assistant_spans:
+            if te <= a_start or ts >= a_end:
+                continue
+            loss[i] = 1
+            break
+    return loss
 
 
 def _build_vicuna_conversation_manual(turns, tokenizer, max_length):
@@ -107,12 +140,19 @@ def _build_vicuna_conversation_manual(turns, tokenizer, max_length):
 
 def _build_chat_template_conversation(turns, tokenizer, max_length):
     """Generic path for models with a registered tokenizer.chat_template
-    (e.g. TinyLlama-Chat). Tokenize prefix-by-prefix so we can mark assistant
-    tokens with loss=1 and user/system tokens with loss=0.
+    (e.g. TinyLlama-Chat).
+
+    Fast path: apply_chat_template(..., tokenize=False) is cheap Jinja
+    rendering; calling it per-turn just to collect character spans is
+    microseconds. Tokenize the final text ONCE with offset_mapping and convert
+    assistant char spans → per-token loss_mask. Semantically equivalent to the
+    old delta-based loop (everything added during an assistant turn —
+    content + trailing </s>/role-separator — gets mask=1) but O(N) instead of
+    O(N²) in conversation length.
     """
     messages = []
-    ids, loss = [], []
-    prev_len = 0
+    assistant_spans = []
+    prev_text = ""
 
     for role, content in turns:
         messages.append({"role": role, "content": content})
@@ -122,16 +162,22 @@ def _build_chat_template_conversation(turns, tokenizer, max_length):
             )
         except Exception:
             return None, None
-        new_ids = tokenizer(text, add_special_tokens=False).input_ids
-        delta = new_ids[prev_len:]
-        mask_value = 1 if role == "assistant" else 0
-        ids.extend(delta)
-        loss.extend([mask_value] * len(delta))
-        prev_len = len(new_ids)
-        if len(ids) >= max_length:
-            break
+        if role == "assistant":
+            assistant_spans.append((len(prev_text), len(text)))
+        prev_text = text
 
-    return ids[:max_length], loss[:max_length]
+    full_text = prev_text
+    enc = tokenizer(
+        full_text,
+        add_special_tokens=False,
+        return_offsets_mapping=True,
+        truncation=True,
+        max_length=max_length,
+    )
+    ids = enc["input_ids"]
+    offsets = enc["offset_mapping"]
+    loss = _mask_from_spans(offsets, assistant_spans)
+    return ids, loss
 
 
 def _build_conversation(item, tokenizer, model_name, max_length):
@@ -177,9 +223,14 @@ def download_and_preprocess(tokenizer, max_samples=None, max_length=2048, model_
         dataset = dataset.select(range(min(max_samples, len(dataset))))
 
     print(f"Preprocessing with chat template (model={model_name})...")
+    try:
+        from tqdm.auto import tqdm
+        iterator = tqdm(dataset, desc="tokenize", total=len(dataset))
+    except ImportError:
+        iterator = dataset
     tokenized_data = []
     skipped = 0
-    for item in dataset:
+    for item in iterator:
         ids, loss = _build_conversation(item, tokenizer, model_name, max_length)
         if ids is None or len(ids) < 4:
             skipped += 1
