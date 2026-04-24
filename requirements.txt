@@ -1,24 +1,30 @@
-# Mirrors the official Medusa repo deps
-# (FasterDecoding/Medusa/pyproject.toml: fschat, torch, transformers>=4.34,
-#  accelerate, sentencepiece, protobuf; train extras: bitsandbytes, wandb, scipy)
-# with two intentional deviations:
-#  - transformers/tokenizers/sentencepiece are pinned (paper has no upper bound,
-#    but >=4.50 routes Llama tokenization through a unified Rust backend that
-#    mishandles vicuna-7b-v1.5's tokenizer.model — encoding gives <unk> for
-#    spaces and decoding leaves SentencePiece markers visible).
-#  - datasets / einops / matplotlib are added for our pipeline (paper's repo
-#    pulls them transitively via fschat / their own scripts).
-torch>=2.0.0
+# Mirrors the official Medusa repo deps (FasterDecoding/Medusa/pyproject.toml)
+# tuned for Colab. Notable deviations:
+#  - transformers/tokenizers/sentencepiece are pinned: paper has no upper bound,
+#    but transformers>=4.50 routes Llama tokenization through a unified Rust
+#    backend that mishandles vicuna-7b-v1.5's tokenizer.model (encoding gives
+#    <unk> for spaces, decoding leaves SentencePiece markers visible).
+#  - torch is intentionally NOT listed: Colab ships a pre-built torch matched
+#    to its CUDA toolkit; reinstalling pulls a generic wheel that breaks
+#    torchvision/torchaudio. Just use Colab's default.
+#  - wandb is dropped: paper has it as an optional train extra but we don't
+#    import it, and it pulls a protobuf<7 pin that fights other Colab packages.
+#  - numpy capped <2.5 to play nice with numba in Colab.
+#  - fschat installs cleanly only with --no-deps (see notebook setup cell);
+#    the only import we use is fastchat.conversation.get_conv_template, which
+#    has no third-party dependencies.
 transformers==4.46.3
 tokenizers==0.20.3
 sentencepiece==0.2.0
-protobuf>=3.20
+# Cap protobuf <5.0: protobuf 5+ removed MessageFactory.GetPrototype which
+# sentencepiece 0.2.0 still calls — surfaces as recurring AttributeError
+# during model/dataset loading. <5.0 also satisfies tensorflow / wandb /
+# google-cloud-* pins that Colab pre-installs.
+protobuf>=3.20.3,<5.0
 accelerate>=0.20.0
-fschat>=0.2.36
 safetensors>=0.4.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.5
 bitsandbytes>=0.41.0
 datasets>=2.14.0
 einops>=0.6.1
 matplotlib>=3.5.0
-wandb>=0.16.0

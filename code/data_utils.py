@@ -56,11 +56,13 @@ def _build_vicuna_conversation(turns, tokenizer, max_length, model_name=None):
     Falls back to a hand-rolled Vicuna template if fschat isn't importable.
     """
     try:
-        from fastchat.model.model_adapter import get_conversation_template
+        # Lightweight FastChat import (pure-stdlib module) — works with
+        # `pip install --no-deps fschat`, avoiding fastapi/uvicorn conflicts.
+        from fastchat.conversation import get_conv_template
     except ImportError:
         return _build_vicuna_conversation_manual(turns, tokenizer, max_length)
 
-    conv = get_conversation_template(model_name or "vicuna")
+    conv = get_conv_template("vicuna_v1.1")
     user_role, asst_role = conv.roles  # ("USER", "ASSISTANT")
 
     ids, loss = [], []
