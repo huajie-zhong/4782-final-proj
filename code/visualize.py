@@ -133,13 +133,21 @@ def plot_acceptance_histogram(benchmarks):
     print(f"Saved {out}")
 
 
-def plot_table3_comparison(tables):
+def plot_table3_comparison(tables, benchmarks=None):
     if not tables:
         print("[skip] table3_comparison — no table3_*.json")
         return
     modes = ["none", "naive", "optimized"]
-    labels = ["Heads only", "+ Tree attn (naive)", "+ Optimized tree"]
+    labels = ["Heads only", "+ Tree attn (naive)", "+ Optimized tree (typical)"]
     runs = [(_short(d.get("model", path)), d) for path, d in tables.items()]
+
+    # For the "optimized" row, prefer typical-acceptance speedup from the matching
+    # *_benchmark.json (same model), since that's the paper-comparable number.
+    typical_by_model = {}
+    for _, b in (benchmarks or {}).items():
+        spd = b.get("speedup_ratio_typical")
+        if spd:
+            typical_by_model[_short(b.get("model", ""))] = spd
 
     n_groups = len(runs) + 1  # +1 for paper column
     x = np.arange(len(modes))
@@ -147,6 +155,8 @@ def plot_table3_comparison(tables):
     fig, ax = plt.subplots(figsize=(8, 5))
     for i, (name, d) in enumerate(runs):
         vals = [d.get("rows", {}).get(m, {}).get("speedup", 0.0) for m in modes]
+        if name in typical_by_model:
+            vals[modes.index("optimized")] = typical_by_model[name]
         ax.bar(x + (i - (n_groups - 1) / 2) * w, vals, w, label=name)
     paper_vals = [PAPER_TABLE3_SPEEDUP[m] for m in modes]
     ax.bar(x + ((n_groups - 1) - (n_groups - 1) / 2) * w, paper_vals, w,
@@ -155,7 +165,7 @@ def plot_table3_comparison(tables):
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.set_ylabel("Speedup vs greedy")
-    ax.set_title("Table 3 ablation — tree mode vs speedup")
+    ax.set_title("Table 3 ablation — tree mode vs speedup\n(optimized tree uses typical acceptance)")
     ax.legend()
     out = os.path.join(RESULTS_DIR, "table3_comparison.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -212,7 +222,7 @@ def main():
     plot_head_accuracies(benchmarks)
     plot_speedup_comparison(benchmarks)
     plot_acceptance_histogram(benchmarks)
-    plot_table3_comparison(tables)
+    plot_table3_comparison(tables, benchmarks)
     plot_acceptance_comparison(comparisons)
 
 
