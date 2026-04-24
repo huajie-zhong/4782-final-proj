@@ -116,8 +116,10 @@ def _format_prompt(tokenizer, prompt, model_id):
     mid = (model_id or "").lower()
     if "vicuna" in mid:
         try:
-            from fastchat.model.model_adapter import get_conversation_template
-            conv = get_conversation_template(model_id)
+            # Lightweight FastChat import: only depends on dataclasses/enum,
+            # so `pip install --no-deps fschat` is enough.
+            from fastchat.conversation import get_conv_template
+            conv = get_conv_template("vicuna_v1.1")
             conv.append_message(conv.roles[0], prompt)
             conv.append_message(conv.roles[1], None)
             return conv.get_prompt()
