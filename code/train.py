@@ -33,6 +33,10 @@ def train(args):
     compute_dtype = torch.bfloat16
     head_dtype = torch.float32
 
+    # SDPA at training time: fused scaled-dot-product attention. Mathematically
+    # equivalent to eager (same softmax, same math), ~1.3-1.8× faster on long seq.
+    # CLAUDE.md note: eager is only required at *inference* for the tree-attention
+    # 4D mask (benchmark.py), so training can safely use SDPA.
     if args.quantize:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -40,20 +44,30 @@ def train(args):
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
         )
-        # Note: eager attn is only required for the tree-mask at inference
-        # (benchmark.py). For training, let HF pick SDPA/FA2.
         backbone = AutoModelForCausalLM.from_pretrained(
             args.model_name,
             quantization_config=bnb_config,
             device_map={"": device},
+            attn_implementation="sdpa",
         )
         model = MedusaModel(backbone, num_heads=4, head_dtype=head_dtype)
         # Backbone is already placed by device_map; only move heads (bnb forbids .to on the whole model).
         model.heads.to(device)
     else:
-        backbone = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=compute_dtype)
+        backbone = AutoModelForCausalLM.from_pretrained(
+            args.model_name, torch_dtype=compute_dtype, attn_implementation="sdpa"
+        )
         model = MedusaModel(backbone, num_heads=4, head_dtype=head_dtype)
         model.to(device)
+
+    # Optional torch.compile. Falls through cleanly on older torch / graph-break
+    # failures so training still runs if compile misbehaves.
+    if args.compile:
+        try:
+            model = torch.compile(model)
+            print("torch.compile enabled.")
+        except Exception as e:
+            print(f"torch.compile failed ({e}); running eager.")
 
     # Verify what is trainable
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -220,6 +234,9 @@ if __name__ == "__main__":
     # 1000 = smoke-test default; paper uses ~60k. Pass --max_samples 60000 for the full run.
     parser.add_argument("--max_samples", type=int, default=1000, help="Number of ShareGPT samples to use (1000=smoke test, 60000=paper-scale)")
     parser.add_argument("--max_length", type=int, default=2048, help="Max sequence length")
+    # NOTE: effective batch size (batch_size * grad_accum_steps) is the paper-relevant
+    # knob for optimizer dynamics — the paper uses 32. Keep the product at 32 across any
+    # override (e.g. 8×4, 16×2, 32×1) so reproducibility is not affected.
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size per GPU")
     parser.add_argument("--grad_accum_steps", type=int, default=8, help="Gradient accumulation steps")
     parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs")
@@ -227,8 +244,9 @@ if __name__ == "__main__":
     parser.add_argument("--warmup_steps", type=int, default=100, help="Warmup steps for scheduler")
     parser.add_argument("--log_interval", type=int, default=50, help="Steps between logging")
     parser.add_argument("--save_path", type=str, default="../results/medusa_heads.pt", help="Path to save weights")
-    parser.add_argument("--quantize", action="store_true", help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs.")
-    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers (0 disables multiprocessing).")
+    parser.add_argument("--quantize", action="store_true", help="Load backbone in 4-bit (bitsandbytes nf4). Required for Vicuna-7B on 24 GB GPUs; on H100 80GB prefer bf16 (faster).")
+    parser.add_argument("--num_workers", type=int, default=8, help="DataLoader workers (0 disables multiprocessing).")
+    parser.add_argument("--compile", action="store_true", help="torch.compile the MedusaModel. Falls back to eager on failure.")
 
     args = parser.parse_args()
     
