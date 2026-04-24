@@ -98,17 +98,55 @@ def _avg(results, key):
     return sum(r[key] for r in results) / len(results) if results else 0.0
 
 
+# ----- Prompt formatting --------------------------------------------------
+
+VICUNA_SYSTEM = (
+    "A chat between a curious user and an artificial intelligence assistant. "
+    "The assistant gives helpful, detailed, and polite answers to the user's questions."
+)
+
+
+def _format_prompt(tokenizer, prompt, model_id):
+    """Wrap a raw instruction in the model's expected chat format.
+
+    Vicuna path uses FastChat's `get_conversation_template` — the same call
+    the official MEDUSA repo uses (medusa/inference/cli.py, train_legacy.py).
+    Falls back to a hand-rolled Vicuna string if fschat isn't importable.
+    """
+    mid = (model_id or "").lower()
+    if "vicuna" in mid:
+        try:
+            from fastchat.model.model_adapter import get_conversation_template
+            conv = get_conversation_template(model_id)
+            conv.append_message(conv.roles[0], prompt)
+            conv.append_message(conv.roles[1], None)
+            return conv.get_prompt()
+        except ImportError:
+            return f"{VICUNA_SYSTEM} USER: {prompt} ASSISTANT:"
+    if getattr(tokenizer, "chat_template", None):
+        try:
+            return tokenizer.apply_chat_template(
+                [{"role": "user", "content": prompt}],
+                tokenize=False, add_generation_prompt=True,
+            )
+        except Exception:
+            return prompt
+    return prompt
+
+
 # ----- Greedy baseline ----------------------------------------------------
 
-def greedy_baseline(model, tokenizer, prompts, max_new_tokens):
+def greedy_baseline(model, tokenizer, prompts, max_new_tokens, model_id=""):
     """Baseline greedy decoding via HF generate. Returns per-prompt result list."""
     if prompts:
-        warmup = tokenizer(prompts[0], return_tensors="pt").to(model.device)
+        warmup_text = _format_prompt(tokenizer, prompts[0], model_id)
+        warmup = tokenizer(warmup_text, return_tensors="pt").to(model.device)
         _ = model.generate(**warmup, max_new_tokens=10, do_sample=False)
 
     results = []
     for prompt in prompts:
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        formatted = _format_prompt(tokenizer, prompt, model_id)
+        inputs = tokenizer(formatted, return_tensors="pt").to(model.device)
         input_len = inputs["input_ids"].shape[1]
 
         start = time.time()
@@ -118,12 +156,12 @@ def greedy_baseline(model, tokenizer, prompts, max_new_tokens):
 
         gen_tokens = outputs.shape[1] - input_len
         tps = gen_tokens / total_time if total_time > 0 else 0.0
-        text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        gen_text = tokenizer.decode(outputs[0, input_len:], skip_special_tokens=True)
         results.append({
-            "prompt": prompt, "generated_text": text,
+            "prompt": prompt, "generated_text": gen_text,
             "tps": tps, "total_time": total_time, "generated_tokens": gen_tokens,
         })
-        print(f"  [{prompt[:30]}...] tps={tps:.2f} time={total_time:.2f}s")
+        print(f"  [{prompt[:30]}...] tps={tps:.2f} time={total_time:.2f}s tokens={gen_tokens}")
     return results
 
 
@@ -140,7 +178,7 @@ def _build_tree_for_mode(top_per_head, tree_mode, tree_budget):
 
 def medusa_decode(model, tokenizer, prompt, max_new_tokens,
                   acceptance="greedy", tree_budget=64, tree_mode="optimized",
-                  design="paper"):
+                  design="paper", model_id=""):
     """MEDUSA propose → tree → verify → accept loop with explicit KV surgery.
 
     Two propose/verify structures are supported; both use all K trained heads
@@ -165,17 +203,20 @@ def medusa_decode(model, tokenizer, prompt, max_new_tokens,
         return _medusa_decode_paper(
             model, tokenizer, prompt, max_new_tokens,
             acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
+            model_id=model_id,
         )
     if design == "extra_forward":
         return _medusa_decode_extra_forward(
             model, tokenizer, prompt, max_new_tokens,
             acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
+            model_id=model_id,
         )
     raise ValueError(f"Unknown design={design!r}; expected 'paper' or 'extra_forward'")
 
 
 def _medusa_decode_paper(model, tokenizer, prompt, max_new_tokens,
-                         acceptance="greedy", tree_budget=64, tree_mode="optimized"):
+                         acceptance="greedy", tree_budget=64, tree_mode="optimized",
+                         model_id=""):
     """Paper-faithful Medusa decode. One forward per step; all K heads used.
 
     Invariant at the top of each iteration:
@@ -189,8 +230,8 @@ def _medusa_decode_paper(model, tokenizer, prompt, max_new_tokens,
     eos_id = tokenizer.eos_token_id
     accept_fn = typical_accept if acceptance == "typical" else greedy_accept
 
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    prompt_ids = input_ids[0].tolist()
+    formatted = _format_prompt(tokenizer, prompt, model_id)
+    input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
     prompt_len = input_ids.shape[1]
 
     generated = []
@@ -287,13 +328,13 @@ def _medusa_decode_paper(model, tokenizer, prompt, max_new_tokens,
     if eos_id is not None and eos_id in generated:
         generated = generated[: generated.index(eos_id) + 1]
     generated = generated[:max_new_tokens]
-    text = tokenizer.decode(prompt_ids + generated, skip_special_tokens=True)
+    text = tokenizer.decode(generated, skip_special_tokens=True)
     return text, avg_acceptance, tps
 
 
 def _medusa_decode_extra_forward(model, tokenizer, prompt, max_new_tokens,
                                  acceptance="greedy", tree_budget=64,
-                                 tree_mode="optimized"):
+                                 tree_mode="optimized", model_id=""):
     """Stretch-goal alternative: dedicated proposal forward, guaranteed bonus token.
 
     Two forwards per step:
@@ -312,8 +353,8 @@ def _medusa_decode_extra_forward(model, tokenizer, prompt, max_new_tokens,
     eos_id = tokenizer.eos_token_id
     accept_fn = typical_accept if acceptance == "typical" else greedy_accept
 
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    prompt_ids = input_ids[0].tolist()
+    formatted = _format_prompt(tokenizer, prompt, model_id)
+    input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
     prompt_len = input_ids.shape[1]
 
     generated = []
@@ -418,23 +459,23 @@ def _medusa_decode_extra_forward(model, tokenizer, prompt, max_new_tokens,
     if eos_id is not None and eos_id in generated:
         generated = generated[: generated.index(eos_id) + 1]
     generated = generated[:max_new_tokens]
-    text = tokenizer.decode(prompt_ids + generated, skip_special_tokens=True)
+    text = tokenizer.decode(generated, skip_special_tokens=True)
     return text, avg_acceptance, tps
 
 
 # ----- Aggregation --------------------------------------------------------
 
 def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budget,
-               tree_mode="optimized", design="paper"):
+               tree_mode="optimized", design="paper", model_id=""):
     """Run medusa_decode on each prompt and return a per-prompt result list."""
     results = []
     for prompt in prompts:
         text, acc_rate, tps = medusa_decode(
             model, tokenizer, prompt, max_new_tokens,
             acceptance=acceptance, tree_budget=tree_budget, tree_mode=tree_mode,
-            design=design,
+            design=design, model_id=model_id,
         )
-        snippet = text[len(prompt):len(prompt) + 80].replace("\n", " ")
+        snippet = text[:80].replace("\n", " ")
         print(f"  [{prompt[:30]}...] acc={acc_rate:.2f} tps={tps:.1f} | {snippet}")
         results.append({
             "prompt": prompt, "generated_text": text,
@@ -444,14 +485,14 @@ def run_medusa(model, tokenizer, prompts, max_new_tokens, acceptance, tree_budge
 
 
 def run_comparison(model, tokenizer, prompts, max_new_tokens, tree_budget=64,
-                   design="paper"):
+                   design="paper", model_id=""):
     """Greedy vs typical acceptance comparison."""
     out = {}
     for mode in ("greedy", "typical"):
         print(f"\n--- Acceptance: {mode} ---")
         results = run_medusa(
             model, tokenizer, prompts, max_new_tokens, mode, tree_budget,
-            design=design,
+            design=design, model_id=model_id,
         )
         avg_acc = _avg(results, "acceptance_rate")
         avg_tps = _avg(results, "tps")
@@ -474,7 +515,9 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
       - optimized: 64-node pruned tree (paper Row 3, ~2.2x target)
     """
     print("\n--- Greedy baseline (shared across ablation rows) ---")
-    greedy_results = greedy_baseline(medusa_model.backbone, tokenizer, prompts, max_new_tokens)
+    greedy_results = greedy_baseline(
+        medusa_model.backbone, tokenizer, prompts, max_new_tokens, model_id=model_id,
+    )
     greedy_tps = _avg(greedy_results, "tps")
     print(f"Avg greedy TPS: {greedy_tps:.2f}")
 
@@ -484,7 +527,7 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
         results = run_medusa(
             medusa_model, tokenizer, prompts, max_new_tokens,
             acceptance=acceptance, tree_budget=64, tree_mode=mode,
-            design=design,
+            design=design, model_id=model_id,
         )
         medusa_tps = _avg(results, "tps")
         avg_acc = _avg(results, "acceptance_rate")
@@ -512,7 +555,7 @@ def run_table3_ablation(medusa_model, tokenizer, prompts, max_new_tokens,
     return {"greedy_tps": greedy_tps, "rows": rows}
 
 
-def compute_head_accuracy(model, tokenizer, prompts, max_length=512):
+def compute_head_accuracy(model, tokenizer, prompts, max_length=512, model_id=""):
     """Per-head top-1 accuracy on eval prompts. Head k predicts token at t+k+2."""
     device = next(model.parameters()).device
     correct = [0] * model.num_heads
@@ -520,7 +563,8 @@ def compute_head_accuracy(model, tokenizer, prompts, max_length=512):
 
     with torch.no_grad():
         for prompt in prompts:
-            input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+            formatted = _format_prompt(tokenizer, prompt, model_id)
+            input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
             input_ids = input_ids[:, :max_length]
             if input_ids.shape[1] < 4:
                 continue
@@ -545,13 +589,16 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
         out_filename = f"{model_id.split('/')[-1]}_benchmark.json"
 
     print("\n--- Greedy baseline ---")
-    greedy_results = greedy_baseline(medusa_model.backbone, tokenizer, prompts, max_new_tokens)
+    greedy_results = greedy_baseline(
+        medusa_model.backbone, tokenizer, prompts, max_new_tokens, model_id=model_id,
+    )
     greedy_tps = _avg(greedy_results, "tps")
     print(f"Avg greedy TPS: {greedy_tps:.2f}")
 
     print(f"\n--- Medusa inference (greedy acceptance, 64-node tree, design={design}) ---")
     medusa_results = run_medusa(
-        medusa_model, tokenizer, prompts, max_new_tokens, "greedy", 64, design=design,
+        medusa_model, tokenizer, prompts, max_new_tokens, "greedy", 64,
+        design=design, model_id=model_id,
     )
     medusa_tps = _avg(medusa_results, "tps")
     avg_acc = _avg(medusa_results, "acceptance_rate")
@@ -560,7 +607,7 @@ def run_full_benchmark(medusa_model, tokenizer, prompts, max_new_tokens,
           f"Avg acceptance: {avg_acc:.3f}")
 
     print("\n--- Per-head accuracy ---")
-    head_accs = compute_head_accuracy(medusa_model, tokenizer, prompts)
+    head_accs = compute_head_accuracy(medusa_model, tokenizer, prompts, model_id=model_id)
     for k, a in enumerate(head_accs):
         print(f"  Head {k}: {a:.3f}")
 
@@ -663,7 +710,21 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id)
+    # Llama-family models: prefer the slow tokenizer for decoding. The fast
+    # tokenizer (`LlamaTokenizerFast`) has a known issue where decoded text
+    # keeps the SentencePiece word-boundary marker (▁) and inserts spaces
+    # between every token ("▁Sure , ▁here ' s ▁a"). The slow tokenizer routes
+    # decode through sentencepiece directly and reassembles cleanly.
+    is_llama_family = any(
+        tag in args.model_id.lower()
+        for tag in ("llama", "vicuna", "tinyllama", "alpaca", "wizard")
+    )
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_id, use_fast=not is_llama_family, legacy=False,
+        )
+    except Exception:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_id)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -696,7 +757,9 @@ def main():
 
     if args.mode in ("greedy", "both"):
         print("\n=== Greedy Baseline ===")
-        results = greedy_baseline(backbone, tokenizer, prompts, args.max_new_tokens)
+        results = greedy_baseline(
+            backbone, tokenizer, prompts, args.max_new_tokens, model_id=args.model_id,
+        )
         avg_tps = _avg(results, "tps")
         print(f"Average greedy TPS: {avg_tps:.2f}")
         with open(os.path.join(output_dir, "greedy_baseline.json"), "w") as f:
@@ -710,6 +773,7 @@ def main():
             comparison = run_comparison(
                 medusa_model, tokenizer, prompts, args.max_new_tokens,
                 tree_budget=args.tree_budget, design=args.design,
+                model_id=args.model_id,
             )
             comparison["selected_tree_budget"] = args.tree_budget
             comparison["tree_mode"] = args.tree
@@ -723,7 +787,7 @@ def main():
             results = run_medusa(
                 medusa_model, tokenizer, prompts, args.max_new_tokens,
                 args.acceptance, args.tree_budget, tree_mode=args.tree,
-                design=args.design,
+                design=args.design, model_id=args.model_id,
             )
             avg_tps = _avg(results, "tps")
             avg_acc = _avg(results, "acceptance_rate")
