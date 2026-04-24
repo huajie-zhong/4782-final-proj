@@ -1,7 +1,24 @@
+# Mirrors the official Medusa repo deps
+# (FasterDecoding/Medusa/pyproject.toml: fschat, torch, transformers>=4.34,
+#  accelerate, sentencepiece, protobuf; train extras: bitsandbytes, wandb, scipy)
+# with two intentional deviations:
+#  - transformers/tokenizers/sentencepiece are pinned (paper has no upper bound,
+#    but >=4.50 routes Llama tokenization through a unified Rust backend that
+#    mishandles vicuna-7b-v1.5's tokenizer.model — encoding gives <unk> for
+#    spaces and decoding leaves SentencePiece markers visible).
+#  - datasets / einops / matplotlib are added for our pipeline (paper's repo
+#    pulls them transitively via fschat / their own scripts).
 torch>=2.0.0
-transformers>=4.31.0
+transformers==4.46.3
+tokenizers==0.20.3
+sentencepiece==0.2.0
+protobuf>=3.20
 accelerate>=0.20.0
+fschat>=0.2.36
+safetensors>=0.4.0
+numpy>=1.24.0
 bitsandbytes>=0.41.0
 datasets>=2.14.0
 einops>=0.6.1
 matplotlib>=3.5.0
+wandb>=0.16.0
