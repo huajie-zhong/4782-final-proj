@@ -1,6 +1,6 @@
 \documentclass[final,t]{beamer}
 
-\usepackage[orientation=landscape,size=custom,width=91.44,height=60.96,scale=1.15]{beamerposter}
+\usepackage[orientation=landscape,size=custom,width=91.44,height=60.96,scale=1.2]{beamerposter}
 
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
@@ -14,6 +14,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{enumitem}
 \usepackage{adjustbox}
+\usepackage{ragged2e}
 \usepackage[most]{tcolorbox}
 
 \usetikzlibrary{positioning, arrows.meta, backgrounds, calc, shadows, shapes.geometric, fit}
@@ -32,9 +33,11 @@
 \setbeamerfont{caption}{size=\small}
 
 \newlength{\colw}
-\setlength{\colw}{0.188\paperwidth}
+\setlength{\colw}{0.30\paperwidth}
 \newlength{\colsep}
-\setlength{\colsep}{0.01\paperwidth}
+\setlength{\colsep}{0.025\paperwidth}
+
+\newcommand{\separatorcolumn}{\begin{column}{\colsep}\end{column}}
 
 \tcbset{
   posterbox/.style={
@@ -55,7 +58,7 @@
     right=3mm,
     top=2mm,
     bottom=2mm,
-    equal height group=cols,
+    valign=top,
   }
 }
 
@@ -68,10 +71,14 @@
     ($(current page.north west)$) rectangle
     ($(current page.north east)+(0,-0.115\paperheight)$);
 
-  \node[anchor=west, xshift=0.015\paperwidth, yshift=-0.058\paperheight,
-        text=white, align=left] at (current page.north west) {%
-    \fontsize{28}{34}\selectfont\bfseries Cornell University\\
-    \fontsize{18}{22}\selectfont CS 4782 \textperiodcentered{} Spring 2026};
+  \node[anchor=west, xshift=0.015\paperwidth, yshift=-0.058\paperheight] 
+    (logo) at (current page.north west) {%
+    \includegraphics[height=4.8cm]{assets/cornell_seal.png}};
+
+  \node[anchor=west, text=white, align=left, xshift=0.6cm] 
+    at (logo.east) {%
+    \fontsize{32}{38}\selectfont\bfseries Cornell University\\[0.8ex]
+    \fontsize{22}{26}\selectfont\mdseries CS 4782 \textendash{} Spring 2026};
 
   \node[anchor=center, yshift=-0.058\paperheight, text=white, align=center]
     at (current page.north) {%
@@ -85,36 +92,30 @@
     \fontsize{18}{22}\selectfont\mdseries hz642 \textperiodcentered{} sd924};
 \end{tikzpicture}
 
-\vspace{0.12\paperheight}
+\vspace{0.08\paperheight}
 
-\centering
-\begin{minipage}{0.97\paperwidth}
+\begin{columns}[t]
 
-% Column 1
-\begin{minipage}[t]{\colw}\setlength{\parskip}{0.5ex}\raggedright\vspace{0pt}
+\separatorcolumn
+
+% ===== Column 1: Motivation + Architecture =====
+\begin{column}{\colw}
+\setlength{\parskip}{1ex}\justifying
 
 \begin{tcolorbox}[posterbox, title=1. Motivation]
+\RaggedRight
 \textbf{The problem.} LLM inference is bottlenecked by \emph{sequential} token generation: one token per forward pass. At batch size 1, GPUs are \emph{memory-bandwidth-bound}, not compute-bound --- most of the silicon is idle every step.
 
 \textbf{The goal.} Generate multiple tokens per forward pass \emph{without} sacrificing output quality.
 
 \textbf{MEDUSA} [Cai et al., 2024] attaches $K$ extra decoding heads to a frozen backbone, predicting tokens $k$ steps ahead in parallel. A tree-attention \emph{verification} pass checks all candidate continuations at once, and an acceptance rule guarantees quality.
 
-\vspace{0.5ex}
-\textbf{Paper target (\S3.1):}\\ MEDUSA-1 on Vicuna-7B $\to$ \textbf{2.18$\times$} speedup.
-
-\vspace{0.8ex}
+\vspace{0.2ex}
 \centering
-\fbox{\begin{minipage}{0.93\colw}\centering
-\textit{[Optional funny image:\\ assets/funny\_medusa.png]}\\[0.5ex]
-\scriptsize (drop in before final build)
-\end{minipage}}
+\includegraphics[width=0.52\colw]{assets/funny\_medusa.png}
 \end{tcolorbox}
 
-\end{minipage}%
-\hspace{\colsep}%
-% Column 2
-\begin{minipage}[t]{\colw}\setlength{\parskip}{0.5ex}\raggedright\vspace{0pt}
+\vspace{-2mm}
 
 \begin{tcolorbox}[posterbox, title=2. Architecture]
 \textbf{MedusaHead:} two-layer residual block
@@ -124,15 +125,16 @@ At step 0 each head \emph{exactly} reproduces the original distribution --- stab
 
 \vspace{0.4ex}
 \centering
-\begin{tikzpicture}[font=\small,
-    headnode/.style={draw=cornellred, rounded corners=3pt, fill=cornellred!10, minimum width=7cm, minimum height=0.9cm, drop shadow, font=\bfseries},
-    hnode/.style={draw=gray, rounded corners=3pt, fill=gray!15, minimum width=7cm, minimum height=1.0cm, drop shadow, font=\bfseries}]
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[font=\small, scale=0.85, transform shape,
+    headnode/.style={draw=cornellred, rounded corners=3pt, fill=cornellred!10, minimum width=6.5cm, minimum height=0.9cm, drop shadow, font=\bfseries},
+    hnode/.style={draw=gray, rounded corners=3pt, fill=gray!15, minimum width=6.5cm, minimum height=1.0cm, drop shadow, font=\bfseries}]
   \node[hnode] (h) at (0,0) {Hidden states $h$};
-  \node[headnode] (lm) at (0,-1.9) {LM head $\to$ token $t{+}1$};
-  \node[headnode] (h0) at (0,-3.2) {Head 0 $\to$ $t{+}2$};
-  \node[headnode] (h1) at (0,-4.5) {Head 1 $\to$ $t{+}3$};
-  \node[headnode] (h2) at (0,-5.8) {Head 2 $\to$ $t{+}4$};
-  \node[headnode] (h3) at (0,-7.1) {Head 3 $\to$ $t{+}5$};
+  \node[headnode] (lm) at (0,-1.6) {LM head $\to$ token $t{+}1$};
+  \node[headnode] (h0) at (0,-2.7) {Head 0 $\to$ $t{+}2$};
+  \node[headnode] (h1) at (0,-3.8) {Head 1 $\to$ $t{+}3$};
+  \node[headnode] (h2) at (0,-4.9) {Head 2 $\to$ $t{+}4$};
+  \node[headnode] (h3) at (0,-6.0) {Head 3 $\to$ $t{+}5$};
   \draw[-{Latex[length=3mm]}, thick, cornellred] (h) -- (lm);
   
   \draw[thick, cornellred] (h.west) -- ++(-0.6,0) coordinate (trunk);
@@ -141,17 +143,21 @@ At step 0 each head \emph{exactly} reproduces the original distribution --- stab
   \draw[-{Latex[length=3mm]}, thick, cornellred, rounded corners=4pt] (trunk) |- (h2.west);
   \draw[-{Latex[length=3mm]}, thick, cornellred, rounded corners=4pt] (trunk) |- (h3.west);
 \end{tikzpicture}
+\end{adjustbox}
 
-\raggedright
+\justifying
 \vspace{0.3ex}
 \textbf{Training (MEDUSA-1, frozen backbone):}\\
 $K{=}4$ heads only \textperiodcentered{} loss $\mathcal{L}=\sum_{k=1}^{K} 0.8^{k}\mathcal{L}_k$ \textperiodcentered{} 60k ShareGPT samples \textperiodcentered{} AdamW $10^{-3}$ \textperiodcentered{} H100 bf16.
 \end{tcolorbox}
 
-\end{minipage}%
-\hspace{\colsep}%
-% Column 3
-\begin{minipage}[t]{\colw}\setlength{\parskip}{0.5ex}\raggedright\vspace{0pt}
+\end{column}
+
+\separatorcolumn
+
+% ===== Column 2: Tree Attention + Key Insight =====
+\begin{column}{\colw}
+\setlength{\parskip}{1ex}\justifying
 
 \begin{tcolorbox}[posterbox, title=3. Tree Attention]
 One forward pass verifies \textbf{64 candidate tokens}.\\
@@ -159,21 +165,22 @@ Each node attends to \textcolor{gray!70!black}{prefix} + \textcolor{cornellred}{
 
 \vspace{0.4ex}
 \centering
-\begin{tikzpicture}[font=\small,
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[font=\small, scale=0.78, transform shape,
     cnode/.style={draw=darkgray, circle, minimum size=1.1cm, fill=gray!20, drop shadow},
     rnode/.style={draw=cornellred!80!black, circle, minimum size=1.1cm, fill=cornellred, text=white, drop shadow, font=\bfseries},
     anode/.style={draw=cornellred!80!black, circle, minimum size=1.1cm, fill=cornellred!40, drop shadow},
     cnode_highlight/.style={draw=cornellred!80!black, circle, minimum size=1.1cm, fill=cornellred!70, text=white, drop shadow, font=\bfseries}]
-    
-  \node[cnode] (p1) at (-4, 1.0) {$P_1$};
-  \node[cnode] (p2) at (-2.5, 1.0) {$P_2$};
+
+  \node[cnode] (p1) at (-5.0, 1.5) {$P_1$};
+  \node[cnode] (p2) at (-3.0, 1.5) {$P_2$};
   \draw[dashed, thick, gray] (p1) -- (p2);
 
-  \node[rnode] (r) at (0, 1.0) {root};
-  \node[anode] (a) at (-1.2, -0.5) {A};
-  \node[cnode] (b) at (1.2, -0.5) {B};
-  \node[cnode_highlight] (c) at (-2.0, -2.0) {C};
-  \node[cnode] (d) at (-0.4, -2.0) {D};
+  \node[rnode] (r) at (0, 1.5) {root};
+  \node[anode] (a) at (-1.6, -0.5) {A};
+  \node[cnode] (b) at (1.6, -0.5) {B};
+  \node[cnode_highlight] (c) at (-2.6, -2.5) {C};
+  \node[cnode] (d) at (-0.6, -2.5) {D};
 
   \draw[thick, cornellred] (r) -- (a);
   \draw[thick, darkgray] (r) -- (b);
@@ -187,8 +194,9 @@ Each node attends to \textcolor{gray!70!black}{prefix} + \textcolor{cornellred}{
     \draw[gray!15, line width=1.5cm, line cap=round, line join=round] (p1.center) -- (p2.center);
   \end{scope}
 \end{tikzpicture}
+\end{adjustbox}
 
-\raggedright
+\justifying
 \vspace{0.4ex}
 \textbf{Mask for C:} attends to \textcolor{gray}{prefix $(P_1,P_2)$} + \textcolor{cornellred}{ancestors (root, A)} + self; \emph{not} siblings (B, D).
 
@@ -203,18 +211,18 @@ Each node attends to \textcolor{gray!70!black}{prefix} + \textcolor{cornellred}{
 \end{itemize}
 \end{tcolorbox}
 
-\end{minipage}%
-\hspace{\colsep}%
-% Column 4
-\begin{minipage}[t]{\colw}\setlength{\parskip}{0.5ex}\raggedright\vspace{0pt}
+\vspace{-2mm}
 
 \begin{tcolorbox}[posterbox, title=4. Results]
 \centering
-\includegraphics[width=\colw]{../results/table3_comparison.png}\\
+\includegraphics[width=0.74\linewidth]{../results/table3_comparison.png}\\
 {\scriptsize Figure 1: Table 3 ablation vs. paper targets.}
 
 \vspace{0.5ex}
 \small
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{7pt}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{@{}lcc@{}}
 \toprule
 \textbf{Configuration} & \textbf{Paper} & \textbf{Ours}\\
@@ -227,63 +235,62 @@ Heads only         & 1.54$\times$ & \textbf{1.67$\times$}\\
 Head-0 accuracy    & $>$60\%     & \textbf{64.1\%}\\
 Accept.\ length    & 3.47 (MED-2) & \textbf{2.87}\\
 \bottomrule
-\end{tabular}\\[0.6ex]
+\end{tabular}
+\end{adjustbox}\\[0.6ex]
 {\scriptsize Table 1: Our reproduction matches the paper's 2.18$\times$ target.}
-
-\vspace{0.4ex}
-\centering
-\includegraphics[width=\colw]{../results/head_accuracies.png}\\
-{\scriptsize Figure 2: Per-head accuracy \textendash{} 64.1\% $\to$ 16.7\% across heads 0\textendash{}3.}
 \end{tcolorbox}
 
-\end{minipage}%
-\hspace{\colsep}%
-% Column 5
-\begin{minipage}[t]{\colw}\setlength{\parskip}{0.5ex}\raggedright\vspace{0pt}
+\end{column}
+
+\separatorcolumn
+
+% ===== Column 3: Key Insight \& Takeaways (full column) =====
+\begin{column}{\colw}
+\setlength{\parskip}{1ex}\justifying
 
 \begin{tcolorbox}[posterbox, title=5. Key Insight \& Takeaways]
-\raggedright
-\textbf{Headline result.}\\
+\setlength{\parskip}{1.7ex}
+\justifying
+\textbf{Headline result.}\\[0.6ex]
 \textbf{2.196$\times$} speedup with typical acceptance on Vicuna-7B --- matches the paper's \textbf{2.18$\times$} target.
 
-\vspace{0.4ex}
-\textbf{Surprise finding.}\\
+\textbf{Surprise finding.}\\[0.6ex]
 A \emph{naive} tree (1.62$\times$) is \emph{slower} than no tree at all (1.67$\times$): a dense 64$\times$64 attention mask costs more than the $\approx$0.03 extra tokens/step it buys. Tree-structure optimization is \textbf{load-bearing}, not cosmetic.
 
-\vspace{0.4ex}
-\textbf{Typical $>$ greedy acceptance.}\\
+\textbf{Typical $>$ greedy acceptance.}\\[0.6ex]
 $+18\%$ effective tokens/step (2.87 vs.\ 2.59) with the \S2.3.1 distributional-equivalence guarantee.
 
-\vspace{0.4ex}
-\textbf{Gap analysis.} Our 2.87 eff.\ tokens/step sits below MEDUSA-2's 3.47 but meets the MEDUSA-1 $<$3.0 target. Residual gap: training on raw ShareGPT rather than Vicuna-regenerated responses.
+\textbf{Gap analysis.}\\[0.6ex]
+Our 2.87 eff.\ tokens/step sits below MEDUSA-2's 3.47 but meets the MEDUSA-1 $<$3.0 target. Residual gap: training on raw ShareGPT rather than Vicuna-regenerated responses.
 
-\vspace{0.4ex}
 \textbf{Future work.}
-\begin{itemize}[leftmargin=*, topsep=0.2ex, itemsep=0.1ex]
+\begin{itemize}[leftmargin=*, topsep=0.6ex, itemsep=0.6ex]
   \item MEDUSA-2: joint fine-tuning with self-distillation (paper target $\sim$2.8$\times$).
   \item Regenerate training data from Vicuna-7B itself.
 \end{itemize}
 
-\vspace{0.4ex}
+\vspace{3ex}
 \hrule
-\vspace{0.3ex}
-\begin{minipage}[t]{0.65\colw}
-{\tiny
+\vspace{0.2ex}{
+\tiny
 \textbf{References}\\
 {[1]} Cai et al. MEDUSA. arXiv:2401.10774 (2024).\\
 {[2]} Touvron et al. Llama 2. arXiv:2307.09288 (2023).\\
 {[3]} Wolf et al. Transformers. EMNLP Demos (2020).\\
-{[4]} Aeala. ShareGPT\_Vicuna\_unfiltered.
+{[4]} Aeala. ShareGPT\_Vicuna\_unfiltered. \\
 }
-\end{minipage}\hfill
-\begin{minipage}[t]{0.30\colw}\centering
-\includegraphics[width=0.95\linewidth]{assets/github_qr.png}\\
+
+\vspace{0.6ex}
+\centering
+\includegraphics[width=0.32\linewidth]{assets/github_qr.png}\\
 {\tiny\emph{scan for code}}
-\end{minipage}
 \end{tcolorbox}
 
-\end{minipage}%
-\end{minipage}
+\end{column}
+
+\separatorcolumn
+
+\end{columns}
 
 \end{frame}
 \end{document}
