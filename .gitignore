@@ -46,3 +46,5 @@ checkpoint-*/
 *.fdb_latexmk
 *.vrb
 *.fls
+
+assets/
