@@ -12,8 +12,10 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{titlesec}
+\usepackage{microtype}
+\usepackage{mathpazo}
 
-\usetikzlibrary{positioning, arrows.meta}
+\usetikzlibrary{positioning, arrows.meta, backgrounds, calc, shadows, shapes.geometric, fit}
 
 \definecolor{cornellred}{HTML}{B31B1B}
 \hypersetup{colorlinks=true, linkcolor=cornellred, urlcolor=cornellred, citecolor=cornellred}
@@ -22,8 +24,8 @@
 \setlength{\parindent}{0pt}
 \captionsetup{font=small, labelfont=bf, skip=4pt}
 
-\titleformat{\section}{\normalfont\large\bfseries\color{cornellred}}{\thesection.}{0.5em}{}
-\titlespacing*{\section}{0pt}{8pt}{3pt}
+\titleformat{\section}{\normalfont\large\bfseries\color{cornellred}}{\thesection.}{0.5em}{}[\vspace{-0.5ex}\color{cornellred}\titlerule]
+\titlespacing*{\section}{0pt}{8pt}{4pt}
 
 \title{\vspace{-2em}\textbf{Reproducing MEDUSA:}\\[2pt]
   \large Speculative Decoding with Multiple Drafting Heads on Vicuna-7B}
@@ -52,37 +54,53 @@ LLM inference is bottlenecked by sequential token generation: each forward pass 
 
 \begin{figure}[H]
 \centering
-\scalebox{0.85}{
-\begin{tikzpicture}[font=\scriptsize]
+\begin{minipage}[c]{0.42\linewidth}\centering
+\begin{tikzpicture}[font=\small,
+    headnode/.style={draw=cornellred, rounded corners=2pt, fill=cornellred!10, minimum width=24mm, minimum height=5.5mm, drop shadow, font=\bfseries},
+    hnode/.style={draw=gray, rounded corners=2pt, fill=gray!15, minimum width=24mm, minimum height=5.5mm, drop shadow, font=\bfseries}]
+  \node[hnode] (h) at (0,0) {Hidden states $h$};
+  \node[headnode] (lm) at (0,-1.0) {LM head $\to$ $t{+}1$};
+  \node[headnode] (h0) at (0,-1.7) {Head 0 $\to$ $t{+}2$};
+  \node[headnode] (h1) at (0,-2.4) {Head 1 $\to$ $t{+}3$};
+  \node[headnode] (h2) at (0,-3.1) {Head 2 $\to$ $t{+}4$};
+  \node[headnode] (h3) at (0,-3.8) {Head 3 $\to$ $t{+}5$};
+  \draw[-{Latex[length=1.4mm]}, thick, cornellred] (h.south) -- (lm.north);
+  \draw[thick, cornellred] (h.west) -- ++(-0.6,0) coordinate (trunk);
+  \draw[-{Latex[length=1.4mm]}, thick, cornellred, rounded corners=2pt] (trunk) |- (h0.west);
+  \draw[-{Latex[length=1.4mm]}, thick, cornellred, rounded corners=2pt] (trunk) |- (h1.west);
+  \draw[-{Latex[length=1.4mm]}, thick, cornellred, rounded corners=2pt] (trunk) |- (h2.west);
+  \draw[-{Latex[length=1.4mm]}, thick, cornellred, rounded corners=2pt] (trunk) |- (h3.west);
+\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.55\linewidth}\centering
+\begin{tikzpicture}[font=\small,
+    cnode/.style={draw=darkgray, circle, minimum size=7mm, fill=gray!20, drop shadow},
+    rnode/.style={draw=cornellred!80!black, circle, minimum size=7mm, fill=cornellred, text=white, drop shadow, font=\bfseries},
+    anode/.style={draw=cornellred!80!black, circle, minimum size=7mm, fill=cornellred!40, drop shadow},
+    cnode_highlight/.style={draw=cornellred!80!black, circle, minimum size=7mm, fill=cornellred!70, text=white, drop shadow, font=\bfseries}]
+  \node[cnode] (p1) at (-1.8,1.0) {$P_1$};
+  \node[cnode] (p2) at (-0.8,1.0) {$P_2$};
+  \node[rnode] (r) at (1.0,1.0) {root};
+  \node[anode] (a) at (0.0,-0.5) {A};
+  \node[cnode] (b) at (2.0,-0.5) {B};
+  \node[cnode_highlight] (c) at (-1.0,-2.0) {C};
+  \node[cnode] (d) at (1.0,-2.0) {D};
 
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=gray!15] (h) at (0,0) {Hidden states $h$};
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=cornellred!10] (lm) at (0,-0.85) {LM head $\to$ $t{+}1$};
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=cornellred!10] (h0) at (0,-1.35) {Head 0 $\to$ $t{+}2$};
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=cornellred!10] (h1) at (0,-1.85) {Head 1 $\to$ $t{+}3$};
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=cornellred!10] (h2) at (0,-2.35) {Head 2 $\to$ $t{+}4$};
-  \node[draw, rounded corners, minimum width=22mm, minimum height=4.5mm, fill=cornellred!10] (h3) at (0,-2.85) {Head 3 $\to$ $t{+}5$};
-  \draw[-{Latex[length=1.4mm]}] (h.south) -- (lm.north);
-  \draw[-{Latex[length=1.4mm]}] (h.south) to[bend right=30] (h0.west);
-  \draw[-{Latex[length=1.4mm]}] (h.south) to[bend right=40] (h1.west);
-  \draw[-{Latex[length=1.4mm]}] (h.south) to[bend right=48] (h2.west);
-  \draw[-{Latex[length=1.4mm]}] (h.south) to[bend right=55] (h3.west);
+  \draw[thick, cornellred] (r) -- (a);
+  \draw[thick, darkgray] (r) -- (b);
+  \draw[thick, cornellred] (a) -- (c);
+  \draw[thick, darkgray] (a) -- (d);
+  \draw[dashed, thick, gray] (p1) -- (p2);
+  \draw[-{Latex[length=1.5mm]}, thick, gray] (p2) -- (r);
+  \node[right=2mm of b, text width=38mm, align=left, font=\small]
+    {\textbf{Attention Mask for C:}\\ Can see \textcolor{gray}{prefix ($P_1,P_2$)},\\ \textcolor{cornellred}{ancestors (root, A)}, and self.\\ \emph{Cannot} see siblings (B, D).};
 
-  \begin{scope}[xshift=6.5cm, yshift=-0.4cm]
-    \node[draw, circle, minimum size=6mm, fill=gray!20] (p1) at (-1.2,0.6) {\scriptsize $P_1$};
-    \node[draw, circle, minimum size=6mm, fill=gray!20] (p2) at (-0.4,0.6) {\scriptsize $P_2$};
-    \node[draw, circle, minimum size=6mm, fill=cornellred, text=white] (r) at (0.8,0.6) {\scriptsize root};
-    \node[draw, circle, minimum size=6mm, fill=cornellred!40] (a) at (0.1,-0.4) {\scriptsize A};
-    \node[draw, circle, minimum size=6mm, fill=gray!10] (b) at (1.5,-0.4) {\scriptsize B};
-    \node[draw, circle, minimum size=6mm, fill=cornellred!70, text=white] (c) at (-0.5,-1.5) {\scriptsize C};
-    \node[draw, circle, minimum size=6mm, fill=gray!10] (d) at (0.5,-1.5) {\scriptsize D};
-    \draw (r) -- (a); \draw (r) -- (b); \draw (a) -- (c); \draw (a) -- (d);
-    \draw[dashed, gray] (p1) -- (p2);
-    \draw[-{Latex[length=1mm]}, gray] (p2) -- (r);
-    \node[right=2mm of b, text width=35mm, align=left, font=\scriptsize]
-      {Node \textbf{C} attends to: \textcolor{gray}{prefix $P_1,P_2$} + \textcolor{cornellred}{ancestors (root, A)} + self.\\ \emph{Not} B, \emph{not} D.};
+  \begin{scope}[on background layer]
+    \draw[cornellred!15, line width=10mm, line cap=round, line join=round] (r.center) -- (a.center) -- (c.center);
+    \draw[gray!15, line width=10mm, line cap=round, line join=round] (p1.center) -- (p2.center);
   \end{scope}
 \end{tikzpicture}
-}
+\end{minipage}
 \caption{\textbf{Left:} MedusaHead architecture --- one backbone forward produces $K{+}1$ logit sets in parallel. \textbf{Right:} Tree-attention sparsity on a toy 5-node tree. In practice the tree has 64 nodes with branching $s=[10,3,2,2]$ and is verified in a single forward pass.}
 \label{fig:arch}
 \end{figure}
@@ -124,7 +142,6 @@ Acceptance length (eff.\ tokens/step)            & 3.47 (MED-2) & \textbf{2.87} 
 
 \textbf{What we would do differently.} Regenerate training responses from Vicuna-7B itself so head targets align with the backbone's own output distribution --- expected to close the $2.87 \to 3.0{+}$ acceptance-length gap. Training with $K{=}5$ once memory allows, and using the paper's exact backbone checkpoint, would rule out residual weight-distribution drift. MEDUSA-2 (joint backbone+head fine-tuning with self-distillation) is the natural next step, targeting $\sim$2.8$\times$ via co-adapted heads.
 
-\clearpage
 \begin{thebibliography}{9}
 \small
 \setlength{\itemsep}{0pt}
