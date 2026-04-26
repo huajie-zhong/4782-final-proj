@@ -255,10 +255,10 @@ Accept.\ length    & 3.47 (MED-2) & \textbf{2.87}\\
 \textbf{2.196$\times$} speedup with typical acceptance on Vicuna-7B --- matches the paper's \textbf{2.18$\times$} target.
 
 \textbf{Surprise finding.}\\[0.6ex]
-A \emph{naive} tree (1.62$\times$) is \emph{slower} than no tree at all (1.67$\times$): a dense 64$\times$64 attention mask costs more than the $\approx$0.03 extra tokens/step it buys. Tree-structure optimization is \textbf{load-bearing}, not cosmetic.
+A \emph{naive} tree (1.62$\times$) is \emph{slower} than no tree at all (1.67$\times$): the dense 220-node Cartesian mask costs more than the $+0.74$ eff.\ tokens/step it buys (1.89 $\to$ 2.63). Tree-structure optimization is \textbf{load-bearing}, not cosmetic.
 
 \textbf{Typical $>$ greedy acceptance.}\\[0.6ex]
-$+18\%$ effective tokens/step (2.87 vs.\ 2.59) with the \S2.3.1 distributional-equivalence guarantee.
+$+18\%$ raw acceptance length (1.87 vs.\ 1.59 tree tokens/step), $+11\%$ effective (2.87 vs.\ 2.59), $+7\%$ TPS, with the \S2.3.1 distributional-equivalence guarantee.
 
 \textbf{Gap analysis.}\\[0.6ex]
 Our 2.87 eff.\ tokens/step sits below MEDUSA-2's 3.47 but meets the MEDUSA-1 $<$3.0 target. Residual gap: training on raw ShareGPT rather than Vicuna-regenerated responses.
