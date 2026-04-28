@@ -38,7 +38,7 @@
 \vspace{-2em}
 
 \section{Introduction}
-LLM inference is bottlenecked by sequential token generation: each forward pass yields only one token, and at batch size one the GPU is memory-bandwidth-bound rather than compute-bound. \textbf{MEDUSA}~\cite{cai2024medusa} attaches $K$ extra decoding heads to a frozen backbone, each predicting a token several steps ahead. A tree-attention verification pass checks all candidate continuations in one forward call, and an acceptance criterion preserves the model's output distribution. We reproduce MEDUSA-1 on Vicuna-7B, targeting the 2.18$\times$ speedup reported in \S3.1 and the technique ablation in Table 3 of the paper.
+LLM inference is bottlenecked by sequential token generation: each forward pass yields only one token, and at batch size one the GPU is memory-bandwidth-bound rather than compute-bound~\cite{pope2022efficiently}. Speculative decoding~\cite{leviathan2023fast,chen2023accelerating} addresses this by drafting multiple tokens cheaply and verifying them in parallel with the target model. \textbf{MEDUSA}~\cite{cai2024medusa} replaces the separate draft model with $K$ extra decoding heads attached to a frozen backbone, each predicting a token several steps ahead. A tree-attention verification pass checks all candidate continuations in one forward call, and an acceptance criterion preserves the model's output distribution. We reproduce MEDUSA-1 on Vicuna-7B~\cite{vicuna2023}, targeting the 2.18$\times$ speedup reported in \S3.1 and the technique ablation in Table 3 of the paper.
 
 \section{Chosen Result}
 \textbf{Primary target:} paper \S3.1, MEDUSA-1 on Vicuna-7B, \textbf{2.18$\times$} wall-clock speedup over greedy autoregressive decoding. \textbf{Secondary target:} Table 3 ablation (\emph{heads-only} $\to$ \emph{naive tree} $\to$ \emph{optimized tree}), which isolates the contribution of each technique and provides independent validation checkpoints.
@@ -48,9 +48,9 @@ LLM inference is bottlenecked by sequential token generation: each forward pass 
 
 \textbf{Training.} Only the $K{=}4$ heads are trainable (frozen backbone, MEDUSA-1). Head $k$ (0-indexed) targets token $t{+}k{+}2$, giving a per-head loss shift of $k{+}2$. We use the paper's weighted sum $\mathcal{L}=\sum_{k=1}^{K}\lambda_k\mathcal{L}_k$ with $\lambda_k=0.8^{k}$, yielding $[0.8,\,0.64,\,0.512,\,0.41]$. One epoch over 60k ShareGPT assistant turns, AdamW ($\text{lr}=10^{-3}$), cosine + 100-step warmup, H100 bf16. Benchmarking runs on an A100, matching the paper's inference hardware.
 
-\textbf{Inference loop} (\emph{propose $\to$ build tree $\to$ verify $\to$ accept $\to$ KV surgery}). We use a static 64-node BFS-pruned tree with top-$s_k$ widths $s=[10,3,2,2]$; the BFS order preserves parent-before-child under truncation. The tree attention mask lets each node attend only to the prefix tokens and its own ancestors (not siblings or cousins), so all 64 candidate continuations are verified in a single forward pass; after acceptance we \texttt{index\_select} the KV entries along the accepted root-to-leaf path. We implement both \emph{greedy} acceptance ($\arg\max{=}$child $\Rightarrow$ bitwise-identical to the autoregressive baseline) and \emph{typical} acceptance (\S2.3.1): $p_{\text{orig}}(x) > \min(\varepsilon,\,\delta e^{-H(p)})$ with $\varepsilon{=}\delta{=}0.09$, distributionally equivalent to the original.
+\textbf{Inference loop} (\emph{propose $\to$ build tree $\to$ verify $\to$ accept $\to$ KV surgery}). We use a static 64-node BFS-pruned tree with top-$s_k$ widths $s=[10,3,2,2]$; the BFS order preserves parent-before-child under truncation. The tree attention mask lets each node attend only to the prefix tokens and its own ancestors (not siblings or cousins), so all 64 candidate continuations are verified in a single forward pass; after acceptance we \texttt{index\_select} the KV entries along the accepted root-to-leaf path. We implement both \emph{greedy} acceptance ($\arg\max{=}$child $\Rightarrow$ bitwise-identical to the autoregressive baseline) and \emph{typical} acceptance (\S2.3.1, after typical sampling~\cite{meister2023typical}): $p_{\text{orig}}(x) > \min(\varepsilon,\,\delta e^{-H(p)})$ with $\varepsilon{=}\delta{=}0.09$, distributionally equivalent to the original.
 
-\textbf{Ablation modes / deviations.} We compare \emph{none} (no tree), \emph{naive} (full 220-node Cartesian tree with a dense causal mask), and \emph{optimized} (BFS-pruned 64-node sparse ancestor-only mask + typical acceptance). We use $K{=}4$ rather than the paper's $K{=}5$ (training-memory), train on raw ShareGPT rather than Vicuna-regenerated responses, and smoke-test on TinyLlama-1.1B before scaling.
+\textbf{Ablation modes / deviations.} We compare \emph{none} (no tree), \emph{naive} (full 220-node Cartesian tree with a dense causal mask), and \emph{optimized} (BFS-pruned 64-node sparse ancestor-only mask + typical acceptance). We use $K{=}4$ rather than the paper's $K{=}5$ (training-memory), train on raw ShareGPT rather than Vicuna-regenerated responses, and smoke-test on TinyLlama-1.1B~\cite{zhang2024tinyllama} before scaling.
 
 \begin{figure}[H]
 \centering
@@ -142,6 +142,8 @@ Acceptance length (eff.\ tokens/step)            & 3.47 (MED-2) & \textbf{2.87} 
 
 \textbf{What we would do differently.} Regenerate training responses from Vicuna-7B itself so head targets align with the backbone's own output distribution --- expected to close the $2.87 \to 3.0{+}$ acceptance-length gap. Training with $K{=}5$ once memory allows, and using the paper's exact backbone checkpoint, would rule out residual weight-distribution drift. MEDUSA-2 (joint backbone+head fine-tuning with self-distillation) is the natural next step, targeting $\sim$2.8$\times$ via co-adapted heads.
 
+\textbf{AI usage disclosure.} We used Anthropic Claude (Claude Code)~\cite{claudecode} as a coding assistant for boilerplate scaffolding (argparse, plotting, JSON I/O), debugging KV-cache shape mismatches, and iterating on this writeup's prose and \LaTeX{} formatting. All algorithmic decisions (tree topology, label-shift convention, acceptance criteria, ablation design) and all reported numbers were produced and verified by the authors; no AI-generated text was included without human review.
+
 \begin{thebibliography}{9}
 \small
 \setlength{\itemsep}{0pt}
@@ -149,6 +151,13 @@ Acceptance length (eff.\ tokens/step)            & 3.47 (MED-2) & \textbf{2.87} 
 \bibitem{touvron2023llama} H.~Touvron et al. \emph{Llama 2: Open Foundation and Fine-Tuned Chat Models.} arXiv:2307.09288, 2023.
 \bibitem{wolf2020transformers} T.~Wolf et al. \emph{Transformers: State-of-the-Art Natural Language Processing.} EMNLP System Demonstrations, 2020.
 \bibitem{sharegpt} Aeala. \emph{ShareGPT\_Vicuna\_unfiltered.} HuggingFace dataset, 2023.
+\bibitem{vicuna2023} W.-L.~Chiang et al. \emph{Vicuna: An Open-Source Chatbot Impressing GPT-4 with 90\%* ChatGPT Quality.} LMSYS, 2023.
+\bibitem{zhang2024tinyllama} P.~Zhang, G.~Zeng, T.~Wang, W.~Lu. \emph{TinyLlama: An Open-Source Small Language Model.} arXiv:2401.02385, 2024.
+\bibitem{leviathan2023fast} Y.~Leviathan, M.~Kalman, Y.~Matias. \emph{Fast Inference from Transformers via Speculative Decoding.} ICML, 2023.
+\bibitem{chen2023accelerating} C.~Chen, S.~Borgeaud, G.~Irving, J.-B.~Lespiau, L.~Sifre, J.~Jumper. \emph{Accelerating Large Language Model Decoding with Speculative Sampling.} arXiv:2302.01318, 2023.
+\bibitem{meister2023typical} C.~Meister, T.~Pimentel, G.~Wiher, R.~Cotterell. \emph{Locally Typical Sampling.} TACL, 2023.
+\bibitem{pope2022efficiently} R.~Pope et al. \emph{Efficiently Scaling Transformer Inference.} arXiv:2211.05102, 2022.
+\bibitem{claudecode} Anthropic. \emph{Claude Code.} \url{https://www.anthropic.com/claude-code}, 2025.
 \end{thebibliography}
 
 \end{document}
