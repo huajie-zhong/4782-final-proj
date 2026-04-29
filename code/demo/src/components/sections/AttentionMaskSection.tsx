@@ -72,27 +72,27 @@ export default function AttentionMaskSection() {
     <section
       id="section-4"
       ref={sectionRef}
-      style={{ height: '900vh' }}
+      style={{ height: '700vh' }}
       className="relative border-t border-birch"
     >
-      <div className="sticky top-0 h-screen flex flex-col justify-center px-8 py-8 bg-parchment">
-        <div className="max-w-5xl mx-auto w-full flex flex-col gap-5">
+      <div className="sticky top-0 h-screen flex flex-col justify-center bg-parchment">
+        <div className="max-w-5xl mx-auto w-full flex flex-col gap-4 md:gap-5">
           {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-start md:justify-between gap-4">
             <div>
-              <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-3 inline-block tracking-widest uppercase">
+              <div className="font-mono text-[10px] md:text-xs text-grove border-b border-grove pb-0.5 mb-2 md:mb-3 inline-block tracking-widest uppercase">
                 §04 — Tree Attention & Verification
               </div>
-              <h2 className="text-2xl font-bold text-ink">{info.title}</h2>
-              <p className="mt-1 text-ink-soft text-sm max-w-xl">{info.desc}</p>
+              <h2 className="text-xl md:text-2xl font-bold text-ink leading-tight">{info.title}</h2>
+              <p className="mt-1 text-ink-soft text-xs md:text-sm max-w-xl">{info.desc}</p>
             </div>
             {/* Step counter + next button */}
-            <div className="flex flex-col items-end gap-2 shrink-0 pt-1">
-              <div className="flex gap-1.5">
+            <div className="flex items-center md:flex-col md:items-end gap-3 md:gap-2 shrink-0 w-full md:w-auto border-t md:border-t-0 border-birch pt-3 md:pt-1">
+              <div className="flex gap-1">
                 {STEP_INFO.map((_, i) => (
                   <div
                     key={i}
-                    className="w-1.5 h-1.5 rounded-sm transition-colors duration-200"
+                    className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-sm transition-colors duration-200"
                     style={{ backgroundColor: i <= step ? '#2A5C45' : '#DDD8CE' }}
                   />
                 ))}
@@ -100,27 +100,29 @@ export default function AttentionMaskSection() {
               <button
                 onClick={() => setStep(s => Math.min(STEP_INFO.length - 1, s + 1))}
                 disabled={step >= STEP_INFO.length - 1}
-                className="text-xs font-mono px-3 py-1 border border-grove text-grove rounded hover:bg-grove hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="ml-auto md:ml-0 text-[10px] md:text-xs font-mono px-2 md:px-3 py-1 border border-grove text-grove rounded hover:bg-grove hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 next step →
               </button>
             </div>
           </div>
-
+ 
           {/* Mask visualization */}
-          <AttentionMaskViz step={step} />
-
+          <div className="flex-1 min-h-0 flex flex-col justify-center">
+            <AttentionMaskViz step={step} />
+          </div>
+ 
           {/* Collapsible insight boxes at step 6+ */}
           {step >= 6 && step < 7 && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
               <button
                 onClick={() => setShowInsights(v => !v)}
-                className="text-xs font-mono text-grove hover:text-ink transition-colors"
+                className="text-[10px] md:text-xs font-mono text-grove hover:text-ink transition-colors"
               >
                 {showInsights ? '▾ hide key properties' : '▸ show key properties'}
               </button>
               {showInsights && (
-                <div className="grid grid-cols-2 gap-3 text-xs mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] md:text-xs mt-2">
                   <div className="border-l-2 border-grove pl-3 py-1">
                     <span className="font-semibold text-grove">Key property:</span>
                     <span className="text-ink-soft ml-1">

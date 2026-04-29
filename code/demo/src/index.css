@@ -5,9 +5,18 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    font-size: 14px;
+  }
+  @screen md {
+    html {
+      font-size: 16px;
+    }
   }
   body {
-    @apply bg-parchment text-ink font-sans antialiased;
+    @apply bg-parchment text-ink font-sans antialiased overflow-x-hidden;
+  }
+  section {
+    @apply px-5 md:px-8 py-12 md:py-20;
   }
 }
 

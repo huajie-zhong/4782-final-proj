@@ -58,9 +58,9 @@ export default function CandidateTreeViz({ inView }: Props) {
       {/* Scrollable tree SVG */}
       <div className="overflow-x-auto border border-birch rounded bg-white">
         <svg
-          width={SVG_W}
-          height={SVG_H}
-          style={{ display: 'block', minWidth: SVG_W }}
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          className="w-full h-auto min-w-[600px]"
+          style={{ display: 'block' }}
         >
           <g transform="translate(30, 40)">
             {/* Links */}

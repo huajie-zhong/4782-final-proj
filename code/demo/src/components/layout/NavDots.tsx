@@ -12,7 +12,7 @@ type Props = { activeSection: number }
 
 export default function NavDots({ activeSection }: Props) {
   return (
-    <nav className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-end gap-0">
+    <nav className="fixed right-4 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col items-end gap-0">
       {/* Vertical spine */}
       <div className="absolute right-1.5 top-0 bottom-0 w-px bg-birch" />
       {SECTIONS.map((label, i) => (

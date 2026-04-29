@@ -23,7 +23,7 @@ export default function HeadProposalViz({ inView, selectedHead }: Props) {
         initial="hidden"
         animate={inView ? 'visible' : 'hidden'}
         exit={{ opacity: 0 }}
-        className={`grid gap-4 w-full ${selectedHead !== null ? 'grid-cols-1 max-w-sm' : 'grid-cols-4'}`}
+        className={`grid gap-4 w-full ${selectedHead !== null ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4'}`}
       >
         {visibleHeads.map(({ k, label, offset, proposals }) => {
           const color = getDepthColor(k + 1)

@@ -8,7 +8,7 @@ export default function ResultsSection() {
   const { ref, inView } = useScrollSection(0.1)
 
   return (
-    <section id="section-6" className="min-h-screen flex flex-col justify-center px-8 py-20 bg-parchment border-t border-birch">
+    <section id="section-6" className="min-h-screen flex flex-col justify-center bg-parchment border-t border-birch">
       <div className="max-w-5xl mx-auto w-full">
         <motion.div
           ref={ref as React.Ref<HTMLDivElement>}
@@ -18,18 +18,18 @@ export default function ResultsSection() {
           className="flex flex-col gap-10"
         >
           <motion.div variants={fadeUp} className="text-center">
-            <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-4 inline-block tracking-widest uppercase">
+            <div className="font-mono text-[10px] md:text-xs text-grove border-b border-grove pb-0.5 mb-4 inline-block tracking-widest uppercase">
               §06 — Real Results
             </div>
-            <h2 className="text-3xl font-bold text-ink">
+            <h2 className="text-2xl md:text-3xl font-bold text-ink">
               2.2× on real hardware
             </h2>
-            <p className="mt-3 text-ink-soft max-w-2xl mx-auto">
+            <p className="mt-3 text-sm md:text-base text-ink-soft max-w-2xl mx-auto">
               Measured on TinyLlama-1.1B-Chat. All numbers from real benchmark runs, not estimates.
               Paper target (Vicuna-7B) achieves 2.18× at the same relative speedup.
             </p>
           </motion.div>
-
+ 
           {/* Big numbers */}
           <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             {[
@@ -39,16 +39,16 @@ export default function ResultsSection() {
               { value: `${(BENCHMARK.avgAcceptanceRateTypical).toFixed(2)}`, unit: 'tok/pass', label: 'Avg tokens accepted' },
             ].map(({ value, unit, label }) => (
               <div key={label} className="bg-white border border-birch rounded p-4">
-                <div className="text-3xl font-bold font-mono text-grove">{value}<span className="text-lg ml-0.5 text-ink-soft">{unit}</span></div>
-                <div className="text-xs text-ink-soft mt-1">{label}</div>
+                <div className="text-2xl md:text-3xl font-bold font-mono text-grove">{value}<span className="text-sm md:text-lg ml-0.5 text-ink-soft">{unit}</span></div>
+                <div className="text-[10px] md:text-xs text-ink-soft mt-1">{label}</div>
               </div>
             ))}
           </motion.div>
-
+ 
           <motion.div variants={fadeUp}>
             <SpeedupCharts inView={inView} />
           </motion.div>
-
+ 
           <motion.div variants={fadeUp} className="text-center pt-4 border-t border-birch">
             <p className="text-ink-soft text-sm">
               CS 4782 Final Project · MEDUSA Speculative Decoding Reproduction

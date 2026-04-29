@@ -31,19 +31,19 @@ export default function AutoregressiveViz({ active }: Props) {
   const medusaTokens = MEDUSA_TOKEN_GROUPS.slice(0, medusaStep).flat()
 
   return (
-    <div className="grid grid-cols-2 gap-6 w-full">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full">
       {/* Autoregressive side */}
-      <div className="bg-white border border-birch rounded p-5">
+      <div className="bg-white border border-birch rounded p-4 md:p-5">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-2 h-2 rounded-sm bg-red-400 animate-pulse" />
-          <span className="text-xs font-mono text-ink-soft uppercase tracking-wider">
+          <span className="text-[10px] md:text-xs font-mono text-ink-soft uppercase tracking-wider">
             Autoregressive
           </span>
-          <span className="ml-auto text-xs text-ink-soft font-mono">
+          <span className="ml-auto text-[10px] md:text-xs text-ink-soft font-mono whitespace-nowrap">
             {arStep} token{arStep !== 1 ? 's' : ''}
           </span>
         </div>
-        <div className="font-mono text-sm text-ink min-h-[80px] flex flex-wrap gap-1 items-start">
+        <div className="font-mono text-xs md:text-sm text-ink min-h-[60px] md:min-h-[80px] flex flex-wrap gap-1 items-start">
           {arTokens.map((tok, i) => (
             <motion.span
               key={i}
@@ -63,24 +63,24 @@ export default function AutoregressiveViz({ active }: Props) {
             />
           )}
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-ink-soft font-mono">
-          <span>1 token / forward pass</span>
+        <div className="mt-3 flex items-center gap-2 text-[10px] md:text-xs text-ink-soft font-mono">
+          <span>1 token / pass</span>
           <span className="ml-auto">~33 tok/s</span>
         </div>
       </div>
 
       {/* MEDUSA side */}
-      <div className="bg-grove-light border border-grove rounded p-5">
+      <div className="bg-grove-light border border-grove rounded p-4 md:p-5">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-2 h-2 rounded-sm bg-grove animate-pulse" />
-          <span className="text-xs font-mono text-grove uppercase tracking-wider">
+          <span className="text-[10px] md:text-xs font-mono text-grove uppercase tracking-wider">
             MEDUSA
           </span>
-          <span className="ml-auto text-xs text-grove font-mono">
+          <span className="ml-auto text-[10px] md:text-xs text-grove font-mono whitespace-nowrap">
             {medusaTokens.length} token{medusaTokens.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div className="font-mono text-sm text-ink min-h-[80px] flex flex-wrap gap-1 items-start">
+        <div className="font-mono text-xs md:text-sm text-ink min-h-[60px] md:min-h-[80px] flex flex-wrap gap-1 items-start">
           <AnimatePresence>
             {MEDUSA_TOKEN_GROUPS.slice(0, medusaStep).map((group, gi) => (
               group.map((tok, ti) => (
@@ -104,8 +104,8 @@ export default function AutoregressiveViz({ active }: Props) {
             />
           )}
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-grove font-mono">
-          <span>~3 tokens / forward pass</span>
+        <div className="mt-3 flex items-center gap-2 text-[10px] md:text-xs text-grove font-mono">
+          <span>~3 tokens / pass</span>
           <span className="ml-auto font-semibold">~72 tok/s</span>
         </div>
       </div>

@@ -15,7 +15,7 @@ export default function ProposalSection() {
   const [selectedHead, setSelectedHead] = useState<number | null>(null)
 
   return (
-    <section id="section-2" className="min-h-screen flex flex-col justify-center px-8 py-20 border-t border-birch">
+    <section id="section-2" className="min-h-screen flex flex-col justify-center border-t border-birch">
       <div className="max-w-5xl mx-auto w-full">
         <motion.div
           ref={ref as React.Ref<HTMLDivElement>}
@@ -25,52 +25,54 @@ export default function ProposalSection() {
           className="flex flex-col gap-8"
         >
           <motion.div variants={fadeUp} className="text-center">
-            <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-4 inline-block tracking-widest uppercase">
+            <div className="font-mono text-[10px] md:text-xs text-grove border-b border-grove pb-0.5 mb-4 inline-block tracking-widest uppercase">
               §02 — Token Proposals
             </div>
-            <h2 className="text-3xl font-bold text-ink">
+            <h2 className="text-2xl md:text-3xl font-bold text-ink">
               Each head proposes tokens at a different depth
             </h2>
-            <p className="mt-3 text-ink-soft max-w-2xl mx-auto">
+            <p className="mt-3 text-xs md:text-base text-ink-soft max-w-2xl mx-auto">
               After one forward pass, the backbone returns hidden states. Each Medusa head applies
               its learned transformation and produces a probability distribution over the vocabulary —
               targeting a different future position.
             </p>
           </motion.div>
-
+ 
           {/* Prompt context */}
           <motion.div variants={fadeUp} className="bg-white border border-birch rounded p-4">
-            <div className="text-xs font-mono text-ink-soft mb-2">Current prompt (example):</div>
-            <div className="font-mono text-sm text-ink">
+            <div className="text-[10px] font-mono text-ink-soft mb-2 uppercase tracking-tight">Current prompt (example):</div>
+            <div className="font-mono text-xs md:text-sm text-ink overflow-x-auto whitespace-nowrap md:whitespace-normal pb-2 md:pb-0">
               <span className="px-2 py-1 bg-parchment rounded border border-birch">{EXAMPLE_PROMPT}</span>
             </div>
-            <div className="text-xs text-ink-soft mt-2">
+            <div className="text-[10px] md:text-xs text-ink-soft mt-2">
               The backbone processes this and returns hidden states h at the last token position.
               All 4 heads then run simultaneously on h.
             </div>
           </motion.div>
-
+ 
           {/* Head selector buttons */}
-          <motion.div variants={fadeUp} className="flex items-center gap-2">
-            <span className="text-xs font-mono text-ink-soft mr-1">Click to focus a head:</span>
-            {HEAD_LABELS.map((label, k) => {
-              const color = getDepthColor(k + 1)
-              const active = selectedHead === k
-              return (
-                <button
-                  key={k}
-                  onClick={() => setSelectedHead(active ? null : k)}
-                  className="px-3 py-1.5 text-xs font-mono rounded border transition-all duration-150"
-                  style={{
-                    borderColor: color,
-                    backgroundColor: active ? color : 'transparent',
-                    color: active ? 'white' : color,
-                  }}
-                >
-                  {label} · top-{S_K[k]} · {HEAD_OFFSETS[k]}
-                </button>
-              )
-            })}
+          <motion.div variants={fadeUp} className="flex flex-col md:flex-row md:items-center gap-3">
+            <span className="text-[10px] md:text-xs font-mono text-ink-soft md:mr-1">Click to focus a head:</span>
+            <div className="flex flex-wrap gap-2">
+              {HEAD_LABELS.map((label, k) => {
+                const color = getDepthColor(k + 1)
+                const active = selectedHead === k
+                return (
+                  <button
+                    key={k}
+                    onClick={() => setSelectedHead(active ? null : k)}
+                    className="flex-1 md:flex-none px-2 md:px-3 py-1.5 text-[9px] md:text-xs font-mono rounded border transition-all duration-150 whitespace-nowrap"
+                    style={{
+                      borderColor: color,
+                      backgroundColor: active ? color : 'transparent',
+                      color: active ? 'white' : color,
+                    }}
+                  >
+                    {label} · t+{k+2}
+                  </button>
+                )
+              })}
+            </div>
           </motion.div>
 
           <motion.div variants={fadeUp}>

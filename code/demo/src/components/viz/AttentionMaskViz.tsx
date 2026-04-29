@@ -40,7 +40,7 @@ function isCellNewlyActive(r: number, c: number, step: number, prevStep: number)
 type Props = { step: number }
 
 export default function AttentionMaskViz({ step }: Props) {
-  const svgRef = useRef<SVGSVGElement>(null)
+  const matrixRef = useRef<SVGGElement>(null)
   const prevStepRef = useRef(-1)
   const [hovered, setHovered] = useState<{ row: number; col: number } | null>(null)
   const [pulseKey, setPulseKey] = useState(0)
@@ -52,13 +52,14 @@ export default function AttentionMaskViz({ step }: Props) {
   }, [step])
 
   useEffect(() => {
-    const svg = d3.select(svgRef.current)
-    svg.selectAll('*').remove()
-
+    if (!matrixRef.current) return
+    const g = d3.select(matrixRef.current)
+    g.selectAll('*').remove()
+ 
     const prevStep = prevStepRef.current
     prevStepRef.current = step
-
-    const g = svg.append('g').attr('transform', 'translate(10, 20)')
+ 
+    // Matrix cells
 
     // Build flat cell data
     const flatData: { r: number; c: number; val: boolean }[] = []
@@ -221,26 +222,33 @@ export default function AttentionMaskViz({ step }: Props) {
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative w-full aspect-[6/4.5] md:aspect-auto">
           <svg
-            ref={svgRef}
-            width={SVG_W + 100}
-            height={SVG_H + 28}
-            style={{ display: 'block', overflow: 'visible' }}
-          />
+            viewBox={`0 0 ${SVG_W + 100} ${SVG_H + 28}`}
+            className="w-full h-auto"
+            style={{ display: 'block' }}
+          >
+            {/* Matrix Layer (Managed by D3) */}
+            <g ref={matrixRef} transform="translate(10, 20)" />
 
-          {/* Pulse Overlay */}
-          <AnimatePresence>
-            {step === 7 && (
-              <motion.div
-                key={pulseKey}
-                className="absolute top-[20px] left-[10px] w-1 h-[400px] bg-indigo-500 shadow-[0_0_15px_#6366f1] z-10"
-                initial={{ left: 10, opacity: 0 }}
-                animate={{ left: 10 + TOTAL_COLS * CELL_W, opacity: [0, 1, 1, 0] }}
-                transition={{ duration: 1.5, ease: 'linear' }}
-              />
-            )}
-          </AnimatePresence>
+            {/* Pulse Overlay (Managed by React, Internal to SVG for alignment) */}
+            <AnimatePresence>
+              {step === 7 && (
+                <motion.rect
+                  key={pulseKey}
+                  x={10}
+                  y={20}
+                  width={2}
+                  height={SVG_H}
+                  fill="#6366f1"
+                  style={{ filter: 'drop-shadow(0 0 8px #6366f1)' }}
+                  initial={{ x: 10, opacity: 0 }}
+                  animate={{ x: [10, 10 + SVG_W], opacity: [0, 1, 1, 0] }}
+                  transition={{ duration: 1.5, ease: 'linear' }}
+                />
+              )}
+            </AnimatePresence>
+          </svg>
         </div>
       </div>
       <div className="flex justify-between text-xs font-mono text-ink-soft">

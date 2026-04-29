@@ -46,27 +46,27 @@ export default function MedusaArchDiagram({ inView }: Props) {
       </motion.div>
 
       {/* Split: LM Head + Medusa Heads */}
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-4 mt-4 md:mt-0">
         {/* Original LM Head */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.65, duration: 0.4 }}
-          className="flex flex-col items-center"
+          className="flex flex-col items-center shrink-0"
         >
           <div className="w-32 h-10 rounded border-2 border-ink bg-white flex items-center justify-center">
             <span className="text-xs font-semibold font-mono text-ink">LM Head</span>
           </div>
           <div className="w-0.5 h-4 bg-birch" />
-          <div className="text-xs font-mono text-ink-soft px-2 py-0.5 bg-parchment rounded border border-birch">
+          <div className="text-[10px] md:text-xs font-mono text-ink-soft px-2 py-0.5 bg-parchment rounded border border-birch">
             next token logits
           </div>
         </motion.div>
-
+ 
         {/* Medusa Heads */}
         <div className="flex flex-col items-center gap-2">
-          <div className="text-xs font-mono text-ink-soft mb-1">MEDUSA Heads (frozen backbone)</div>
-          <div className="flex gap-2">
+          <div className="text-[10px] md:text-xs font-mono text-ink-soft mb-1 uppercase tracking-tight">MEDUSA Heads (frozen backbone)</div>
+          <div className="grid grid-cols-2 md:flex gap-2">
             {HEAD_LABELS.map(({ k, offset, color }, i) => (
               <motion.div
                 key={k}
@@ -76,16 +76,16 @@ export default function MedusaArchDiagram({ inView }: Props) {
                 className="flex flex-col items-center gap-1"
               >
                 <div
-                  className="w-24 rounded border-2 p-2 text-center"
+                  className="w-20 md:w-24 rounded border-2 p-1.5 md:p-2 text-center"
                   style={{ borderColor: color, backgroundColor: `${color}18` }}
                 >
-                  <div className="text-xs font-bold font-mono" style={{ color }}>Head {k}</div>
-                  <div className="text-[10px] font-mono text-ink-soft mt-0.5">t{offset}</div>
+                  <div className="text-[10px] md:text-xs font-bold font-mono" style={{ color }}>Head {k}</div>
+                  <div className="text-[9px] md:text-xs font-mono text-ink-soft mt-0.5">t{offset}</div>
                 </div>
                 <div className="w-0.5 h-3" style={{ backgroundColor: color }} />
                 {/* Formula */}
                 <div
-                  className="text-[9px] font-mono px-1.5 py-1 rounded border text-center leading-tight max-w-[96px]"
+                  className="text-[8px] md:text-[9px] font-mono px-1.5 py-1 rounded border text-center leading-tight max-w-[80px] md:max-w-[96px]"
                   style={{ borderColor: `${color}60`, backgroundColor: `${color}0d`, color: '#6B6460' }}
                 >
                   W₁<span className="opacity-50">(0)</span>→SiLU<br/>→+h→W₂<span className="opacity-50">(LM)</span>
@@ -95,7 +95,7 @@ export default function MedusaArchDiagram({ inView }: Props) {
                   <motion.div
                     animate={{ opacity: [1, 0.4, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="text-[9px] px-1.5 py-0.5 rounded border font-semibold font-mono"
+                    className="text-[8px] px-1.5 py-0.5 rounded border font-semibold font-mono"
                     style={{ borderColor: color, color, backgroundColor: `${color}15` }}
                   >
                     W₁ zeroed
