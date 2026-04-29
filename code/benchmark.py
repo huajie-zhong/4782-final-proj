@@ -9,6 +9,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 sys.path.insert(0, os.path.dirname(__file__))
 from model import MedusaModel
+from latent_model import LatentMedusaModel
 from utils import (
     build_candidate_tree, build_linear_tree, build_naive_tree,
     generate_tree_mask, generate_position_ids,
@@ -692,9 +693,32 @@ def load_backbone(model_id, device, quantize=False):
     return backbone
 
 
-def load_medusa(backbone, device, checkpoint_path):
-    """Wrap backbone with Medusa heads and load checkpoint if present."""
-    medusa_model = MedusaModel(backbone, num_heads=4)
+def load_medusa(backbone, device, checkpoint_path, head_type="original",
+                d_latent=None, per_head_latent=False):
+    """Wrap backbone with Medusa heads and load checkpoint if present.
+
+    When head_type='latent', uses LatentMedusaModel.  Checkpoint metadata
+    (saved by train_latent.py) is used to reconstruct the correct architecture.
+    Explicit d_latent/per_head_latent args override checkpoint metadata.
+    """
+    if head_type == "latent":
+        # Try to read metadata from checkpoint first
+        ckpt_meta = {}
+        if os.path.exists(checkpoint_path):
+            raw = torch.load(checkpoint_path, map_location=device)
+            if isinstance(raw, dict) and "metadata" in raw:
+                ckpt_meta = raw["metadata"]
+        eff_d_latent = d_latent or ckpt_meta.get("d_latent", backbone.config.hidden_size // 4)
+        eff_per_head = per_head_latent or ckpt_meta.get("per_head_latent", False)
+        medusa_model = LatentMedusaModel(
+            backbone, num_heads=4, d_latent=eff_d_latent,
+            per_head_latent=eff_per_head,
+        )
+        print(f"Using LatentMedusaModel: d_latent={eff_d_latent}, "
+              f"per_head={eff_per_head}, latent_dims={medusa_model.latent_dims}")
+    else:
+        medusa_model = MedusaModel(backbone, num_heads=4)
+
     # If the backbone was loaded in 4-bit, bitsandbytes forbids .to() on it.
     # Detect via getattr and only move the heads in that case.
     is_quantized = getattr(backbone, "is_quantized", False) or getattr(backbone, "is_loaded_in_4bit", False)
@@ -703,7 +727,12 @@ def load_medusa(backbone, device, checkpoint_path):
     else:
         medusa_model.to(device)
     if os.path.exists(checkpoint_path):
-        state_dict = torch.load(checkpoint_path, map_location=device)
+        raw = torch.load(checkpoint_path, map_location=device)
+        # Latent checkpoints wrap state_dict in {"heads_state_dict": ..., "metadata": ...}
+        if isinstance(raw, dict) and "heads_state_dict" in raw:
+            state_dict = raw["heads_state_dict"]
+        else:
+            state_dict = raw
         medusa_model.heads.load_state_dict(state_dict)
         print(f"Loaded head checkpoint from {checkpoint_path}")
     else:
@@ -743,6 +772,14 @@ def main():
                              "heads 0-K-1 at tree depths 1-K (§2.3 / Figure 6). "
                              "'extra_forward' = stretch-goal variant with a separate proposal "
                              "forward and a guaranteed bonus token per step (still uses all heads).")
+    # --- Latent head options ---
+    parser.add_argument("--head_type", choices=["original", "latent"], default="original",
+                        help="Head architecture: 'original' = standard Medusa, "
+                             "'latent' = MLA-style bottleneck")
+    parser.add_argument("--d_latent", type=int, default=None,
+                        help="Latent dim override (default reads from checkpoint or hidden//4)")
+    parser.add_argument("--per_head_latent", action="store_true",
+                        help="Use decreasing latent dims per head")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -768,14 +805,23 @@ def main():
 
     output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "results")
     os.makedirs(output_dir, exist_ok=True)
-    ckpt_path = args.checkpoint or os.path.join(output_dir, "medusa_heads.pt")
+    # Default checkpoint differs by head type
+    if args.checkpoint:
+        ckpt_path = args.checkpoint
+    elif args.head_type == "latent":
+        ckpt_path = os.path.join(output_dir, "latent_medusa_heads.pt")
+    else:
+        ckpt_path = os.path.join(output_dir, "medusa_heads.pt")
 
     prompts = DEFAULT_PROMPTS
     backbone = load_backbone(args.model_id, device, quantize=args.quantize)
 
     if args.mode == "full":
         print(f"\n=== Full Benchmark — {args.model_id} ===")
-        medusa_model = load_medusa(backbone, device, ckpt_path)
+        medusa_model = load_medusa(backbone, device, ckpt_path,
+                                    head_type=args.head_type,
+                                    d_latent=args.d_latent,
+                                    per_head_latent=args.per_head_latent)
         run_full_benchmark(
             medusa_model, tokenizer, prompts,
             args.max_new_tokens, output_dir, model_id=args.model_id,
@@ -785,7 +831,10 @@ def main():
 
     if args.mode == "table3":
         print(f"\n=== Table 3 Ablation — {args.model_id} ===")
-        medusa_model = load_medusa(backbone, device, ckpt_path)
+        medusa_model = load_medusa(backbone, device, ckpt_path,
+                                    head_type=args.head_type,
+                                    d_latent=args.d_latent,
+                                    per_head_latent=args.per_head_latent)
         run_table3_ablation(
             medusa_model, tokenizer, prompts, args.max_new_tokens,
             output_dir, model_id=args.model_id, acceptance=args.acceptance,
@@ -805,7 +854,10 @@ def main():
 
     if args.mode in ("medusa", "both"):
         print("\n=== Medusa Inference ===")
-        medusa_model = load_medusa(backbone, device, ckpt_path)
+        medusa_model = load_medusa(backbone, device, ckpt_path,
+                                    head_type=args.head_type,
+                                    d_latent=args.d_latent,
+                                    per_head_latent=args.per_head_latent)
 
         if args.compare:
             comparison = run_comparison(

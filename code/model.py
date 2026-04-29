@@ -107,7 +107,7 @@ class MedusaModel(nn.Module):
             original_logits = None
 
         # Get Medusa head logits
-        head_logits = [head(hidden_states) for head in self.heads]
+        head_logits = [head(hidden_states.to(head.linear1.weight.dtype)) for head in self.heads]
 
         # Usually, during generation we want past_key_values
         if "use_cache" in kwargs and kwargs["use_cache"] or past_key_values is not None:
