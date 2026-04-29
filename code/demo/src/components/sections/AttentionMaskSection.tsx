@@ -31,6 +31,18 @@ const STEP_INFO = [
     title: 'Interactive — hover to explore',
     desc: "Hover over any cell to see a node's full attention pattern. Notice: no node attends to siblings or cousins — only ancestors.",
   },
+  {
+    title: 'The Forward Pass',
+    desc: 'Now, we feed all candidates to the GPU. A single "pulse" verifies every hypothesis in parallel using this mask.',
+  },
+  {
+    title: 'The Matrix Output',
+    desc: 'The model produces logits for every position simultaneously. Each row produces a prediction for the next token in its branch.',
+  },
+  {
+    title: 'Select Longest Valid Path',
+    desc: 'We follow the "pulse" of matches from the root. The longest contiguous chain of correct speculations is accepted into the final sequence.',
+  },
 ]
 
 export default function AttentionMaskSection() {
@@ -46,7 +58,7 @@ export default function AttentionMaskSection() {
       const sectionHeight = section.offsetHeight
       const viewH = window.innerHeight
       const progress = Math.max(0, Math.min(1, (-rect.top) / (sectionHeight - viewH)))
-      const newStep = Math.min(6, Math.floor(progress * 7))
+      const newStep = Math.min(STEP_INFO.length - 1, Math.floor(progress * STEP_INFO.length))
       setStep(newStep)
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -60,7 +72,7 @@ export default function AttentionMaskSection() {
     <section
       id="section-4"
       ref={sectionRef}
-      style={{ height: '600vh' }}
+      style={{ height: '900vh' }}
       className="relative border-t border-birch"
     >
       <div className="sticky top-0 h-screen flex flex-col justify-center px-8 py-8 bg-parchment">
@@ -69,7 +81,7 @@ export default function AttentionMaskSection() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-3 inline-block tracking-widest uppercase">
-                §04 — Tree Attention Mask
+                §04 — Tree Attention & Verification
               </div>
               <h2 className="text-2xl font-bold text-ink">{info.title}</h2>
               <p className="mt-1 text-ink-soft text-sm max-w-xl">{info.desc}</p>
@@ -86,8 +98,8 @@ export default function AttentionMaskSection() {
                 ))}
               </div>
               <button
-                onClick={() => setStep(s => Math.min(6, s + 1))}
-                disabled={step >= 6}
+                onClick={() => setStep(s => Math.min(STEP_INFO.length - 1, s + 1))}
+                disabled={step >= STEP_INFO.length - 1}
                 className="text-xs font-mono px-3 py-1 border border-grove text-grove rounded hover:bg-grove hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 next step →
@@ -98,8 +110,8 @@ export default function AttentionMaskSection() {
           {/* Mask visualization */}
           <AttentionMaskViz step={step} />
 
-          {/* Collapsible insight boxes at step 6 */}
-          {step >= 6 && (
+          {/* Collapsible insight boxes at step 6+ */}
+          {step >= 6 && step < 7 && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
               <button
                 onClick={() => setShowInsights(v => !v)}
@@ -129,7 +141,7 @@ export default function AttentionMaskSection() {
           )}
 
           <div className="text-xs font-mono text-ink-soft text-center">
-            scroll or click next step ({step + 1}/7)
+            scroll or click next step ({step + 1}/{STEP_INFO.length})
           </div>
         </div>
       </div>

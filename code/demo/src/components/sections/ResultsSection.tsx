@@ -8,7 +8,7 @@ export default function ResultsSection() {
   const { ref, inView } = useScrollSection(0.1)
 
   return (
-    <section id="section-7" className="min-h-screen flex flex-col justify-center px-8 py-20 bg-parchment border-t border-birch">
+    <section id="section-6" className="min-h-screen flex flex-col justify-center px-8 py-20 bg-parchment border-t border-birch">
       <div className="max-w-5xl mx-auto w-full">
         <motion.div
           ref={ref as React.Ref<HTMLDivElement>}
@@ -19,7 +19,7 @@ export default function ResultsSection() {
         >
           <motion.div variants={fadeUp} className="text-center">
             <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-4 inline-block tracking-widest uppercase">
-              §07 — Real Results
+              §06 — Real Results
             </div>
             <h2 className="text-3xl font-bold text-ink">
               2.2× on real hardware

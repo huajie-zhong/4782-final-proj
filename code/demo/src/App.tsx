@@ -5,7 +5,6 @@ import ArchitectureSection from './components/sections/ArchitectureSection'
 import ProposalSection from './components/sections/ProposalSection'
 import TreeSection from './components/sections/TreeSection'
 import AttentionMaskSection from './components/sections/AttentionMaskSection'
-import VerifySection from './components/sections/VerifySection'
 import AcceptSection from './components/sections/AcceptSection'
 import ResultsSection from './components/sections/ResultsSection'
 
@@ -15,7 +14,7 @@ export default function App() {
   useEffect(() => {
     const handleScroll = () => {
       const mid = window.innerHeight / 2
-      for (let i = 7; i >= 0; i--) {
+      for (let i = 6; i >= 0; i--) {
         const el = document.getElementById(`section-${i}`)
         if (el) {
           const rect = el.getBoundingClientRect()
@@ -38,9 +37,9 @@ export default function App() {
       <ProposalSection />
       <TreeSection />
       <AttentionMaskSection />
-      <VerifySection />
       <AcceptSection />
       <ResultsSection />
     </div>
   )
 }
+

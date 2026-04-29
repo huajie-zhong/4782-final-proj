@@ -3,8 +3,7 @@ const SECTIONS = [
   'Architecture',
   'Token Proposals',
   'Candidate Tree',
-  'Tree Attention',
-  'Verify Pass',
+  'Attention & Verify',
   'Acceptance Walk',
   'Results',
 ]

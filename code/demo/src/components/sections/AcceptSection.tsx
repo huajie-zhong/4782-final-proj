@@ -27,7 +27,7 @@ export default function AcceptSection() {
 
   return (
     <section
-      id="section-6"
+      id="section-5"
       ref={sectionRef}
       style={{ height: '500vh' }}
       className="relative border-t border-birch"
@@ -37,7 +37,7 @@ export default function AcceptSection() {
           <div className="flex items-start justify-between">
             <div>
               <div className="font-mono text-xs text-grove border-b border-grove pb-0.5 mb-3 inline-block tracking-widest uppercase">
-                §06 — Acceptance Walk
+                §05 — Acceptance Walk
               </div>
               <h2 className="text-2xl font-bold text-ink">
                 Walk the tree, collect the longest valid sequence
