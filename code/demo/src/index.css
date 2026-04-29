@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-parchment text-ink font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .depth-1-color { color: #f59e0b; }
+  .depth-2-color { color: #10b981; }
+  .depth-3-color { color: #0ea5e9; }
+  .depth-4-color { color: #8b5cf6; }
+
+  .depth-1-bg { background-color: #f59e0b; }
+  .depth-2-bg { background-color: #10b981; }
+  .depth-3-bg { background-color: #0ea5e9; }
+  .depth-4-bg { background-color: #8b5cf6; }
+}
