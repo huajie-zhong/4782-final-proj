@@ -32,7 +32,7 @@ const EXAMPLE_PROMPTS = [
   'Compose a short poem about the moon.',
 ]
 
-const BUDGETS = [16, 32, 64, 128]
+const BUDGETS = [64, 128, 256, 512]
 
 type StreamState = {
   steps: StepEvent[]
@@ -247,7 +247,7 @@ export default function LiveDemoSection() {
                     mode === m ? 'bg-grove text-white border-grove shadow-sm' : 'border-birch text-ink-soft hover:border-ink-soft'
                   }`}
                 >
-                  {m === 'base' ? 'No Head' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
+                  {m === 'base' ? 'No Extra Head' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
                 </button>
               ))}
             </div>

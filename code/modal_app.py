@@ -71,7 +71,7 @@ _image = (
 MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 CHECKPOINT = "/app/medusa_heads_tinyllama.pt"
 S_K = [10, 3, 2, 2]
-MAX_TOKENS_CAP = 128
+MAX_TOKENS_CAP = 512
 
 # ── Model globals — None until serve() populates them on container start ───────
 
