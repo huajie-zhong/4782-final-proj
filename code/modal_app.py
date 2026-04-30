@@ -357,6 +357,7 @@ async def generate(prompt: str, max_new_tokens: int = 64, mode: str = "medusa", 
     volumes={"/hf-cache": _volume},
     scaledown_window=300,
     timeout=300,
+    allow_concurrent_inputs=4,
 )
 @modal.asgi_app()
 def serve():

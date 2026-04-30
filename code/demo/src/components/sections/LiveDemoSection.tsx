@@ -282,20 +282,26 @@ export default function LiveDemoSection() {
 
         {/* Output Area */}
         <div className="flex flex-wrap gap-6 items-stretch">
-          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base Model", "1 token per forward pass", "ink-soft")}
-          {(mode === 'medusa' || mode === 'compare') && renderStreamBox(medusa, "Medusa Head", "Multiple tokens per forward pass", "grove")}
+          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base Model", "Standard 1-token-at-a-time", "blue-600")}
+          {(mode === 'medusa' || mode === 'compare') && renderStreamBox(medusa, "Medusa Head", "Speculative multiple tokens", "grove")}
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-8 text-[11px] font-mono mt-4">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-sm bg-parchment border border-birch" />
-            <span className="text-ink-soft">Standard Token</span>
+        {/* Legend / Hint */}
+        <div className="flex flex-col items-center gap-4 mt-4">
+          <div className="flex flex-wrap justify-center gap-8 text-[11px] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-sm bg-blue-50 border-b-2 border-blue-500 text-blue-800">Normal Token</span>
+              <span className="text-ink-soft">Standard pass (Base model)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-sm bg-green-50 border-b-2 border-green-500 text-green-800">Extra Token</span>
+              <span className="text-ink-soft">Speculated & verified (Medusa)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-sm bg-green-100 border-b-2 border-green-500 text-green-800">Medusa Token</span>
-            <span className="text-ink-soft">Speculated & Verified</span>
-          </div>
+          <p className="text-[10px] text-ink-soft font-mono max-w-lg text-center opacity-70">
+            Hint: Medusa heads predict multiple future tokens in parallel. If verified, they are shown in <span className="text-green-600 font-bold">green</span>. 
+            The standard model output is shown in <span className="text-blue-600 font-bold">blue</span>.
+          </p>
         </div>
 
         <p className="text-center text-[10px] text-ink-soft font-mono opacity-60">

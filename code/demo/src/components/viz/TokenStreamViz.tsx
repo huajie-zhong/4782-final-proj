@@ -19,13 +19,8 @@ type Props = {
   isStreaming: boolean
 }
 
-const STEP_COLORS = [
-  { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' }, // amber
-  { bg: '#d1fae5', border: '#10b981', text: '#065f46' }, // emerald
-  { bg: '#e0f2fe', border: '#0ea5e9', text: '#0c4a6e' }, // sky
-  { bg: '#ede9fe', border: '#8b5cf6', text: '#4c1d95' }, // violet
-  { bg: '#fce7f3', border: '#ec4899', text: '#831843' }, // pink
-]
+const NORMAL_COLOR = { bg: '#eff6ff', border: '#3b82f6', text: '#1e3a8a' } // blue
+const SPEC_COLOR = { bg: '#f0fdf4', border: '#22c55e', text: '#166534' }   // green
 
 export default function TokenStreamViz({ steps, isStreaming }: Props) {
   if (steps.length === 0) {
@@ -40,34 +35,36 @@ export default function TokenStreamViz({ steps, isStreaming }: Props) {
     <div className="font-mono text-sm leading-relaxed break-words">
       <AnimatePresence initial={false}>
         {steps.map((s) => {
-          const color = STEP_COLORS[Math.abs(s.step) % STEP_COLORS.length]
           if (s.tokens.length === 0) return null
           
           return (
             <span key={s.step} className="inline whitespace-pre-wrap">
-              {s.tokens.map((t, i) => (
-                <motion.span
-                  key={`${s.step}-${i}`}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ 
-                    duration: 0.15, 
-                    delay: i * 0.05 // Stagger within step
-                  }}
-                  style={{
-                    backgroundColor: t.spec ? '#dcfce7' : color.bg, // green-100 for spec
-                    borderBottom: `2px solid ${t.spec ? '#22c55e' : color.border}`, // green-500 for spec
-                    color: t.spec ? '#166534' : color.text, // green-800 for spec
-                    padding: '0 1px',
-                    marginRight: '0px',
-                    borderRadius: '2px',
-                  }}
-                  className="inline relative group"
-                  title={t.spec ? "Speculative token (MEDUSA)" : "Base model token"}
-                >
-                  {t.text}
-                </motion.span>
-              ))}
+              {s.tokens.map((t, i) => {
+                const color = t.spec ? SPEC_COLOR : NORMAL_COLOR
+                return (
+                  <motion.span
+                    key={`${s.step}-${i}`}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ 
+                      duration: 0.15, 
+                      delay: i * 0.05 // Stagger within step
+                    }}
+                    style={{
+                      backgroundColor: color.bg,
+                      borderBottom: `2px solid ${color.border}`,
+                      color: color.text,
+                      padding: '0 1px',
+                      marginRight: '0px',
+                      borderRadius: '2px',
+                    }}
+                    className="inline relative group"
+                    title={t.spec ? "Speculative token (MEDUSA)" : "Base model token"}
+                  >
+                    {t.text}
+                  </motion.span>
+                )
+              })}
             </span>
           )
         })}
