@@ -23,7 +23,7 @@ DEFAULT_PROMPTS = [
     "Give me a step-by-step recipe for chocolate chip cookies.",
 ]
 
-S_K = [10, 3, 2, 2]  # top-k widths per Medusa head (paper §2.3)
+S_K = [10, 6, 4, 3]  # top-k widths per Medusa head (paper §2.3)
 
 
 # ----- KV cache utilities -------------------------------------------------

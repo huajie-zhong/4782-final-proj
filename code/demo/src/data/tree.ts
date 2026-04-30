@@ -92,5 +92,5 @@ export function getAncestorIds(nodeId: number, parentIndices: number[]): number[
 }
 
 export const DEPTH_COUNTS = [1, 3, 6, 10]
-export const S_K = [10, 3, 2, 2]
+export const S_K = [10, 6, 4, 3]
 export const TREE_NODES = buildTreeNodes()

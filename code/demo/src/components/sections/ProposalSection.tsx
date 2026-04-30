@@ -8,7 +8,7 @@ import { getDepthColor } from '../../data/tree'
 
 const HEAD_LABELS = ['Head 0', 'Head 1', 'Head 2', 'Head 3']
 const HEAD_OFFSETS = ['t+2', 't+3', 't+4', 't+5']
-const S_K = [10, 3, 2, 2]
+const S_K = [10, 6, 4, 3]
 
 export default function ProposalSection() {
   const { ref, inView } = useScrollSection(0.2)

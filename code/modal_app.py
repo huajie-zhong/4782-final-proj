@@ -70,7 +70,7 @@ _image = (
 
 MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 CHECKPOINT = "/app/medusa_heads_tinyllama.pt"
-S_K = [10, 3, 2, 2]
+S_K = [10, 6, 4, 3]
 MAX_TOKENS_CAP = 512
 
 # ── Model globals — None until serve() populates them on container start ───────
@@ -143,7 +143,7 @@ def _format_prompt(prompt: str) -> str:
         return prompt
 
 
-def _run_inference(prompt: str, max_new_tokens: int, mode: str, acceptance: str, device: str):
+def _run_inference(prompt: str, max_new_tokens: int, mode: str, acceptance: str, device: str, tree_budget: int = 64):
     """Generator yielding one event dict per decoding step.
     mode: "medusa" or "base"
     """
@@ -166,11 +166,13 @@ def _run_inference(prompt: str, max_new_tokens: int, mode: str, acceptance: str,
         nonlocal all_token_ids
         results = []
         for tid in new_ids:
-            # Decode with full prefix to ensure correct spacing/subword merging
-            prev_text = _tokenizer.decode(all_token_ids, skip_special_tokens=True)
+            old_text = _tokenizer.decode(all_token_ids, skip_special_tokens=True)
             all_token_ids.append(tid)
-            curr_text = _tokenizer.decode(all_token_ids, skip_special_tokens=True)
-            results.append(curr_text[len(prev_text):])
+            new_text = _tokenizer.decode(all_token_ids, skip_special_tokens=True)
+            diff = new_text[len(old_text):]
+            if not diff and tid not in [0, 1, 2]: # handle cases where decode might be empty
+                 diff = _tokenizer.decode([tid])
+            results.append(diff)
         return results
 
     with torch.no_grad():
@@ -227,7 +229,8 @@ def _run_inference(prompt: str, max_new_tokens: int, mode: str, acceptance: str,
                     head_preds[k].topk(S_K[k]).indices.unsqueeze(0)
                     for k in range(len(S_K))
                 ]
-                tree_tokens, tree_parent_indices = build_candidate_tree(top_per_head, tree_budget=64)
+                # Use requested tree_budget
+                tree_tokens, tree_parent_indices = build_candidate_tree(top_per_head, tree_budget=tree_budget)
                 tree_size = tree_tokens.shape[0]
 
                 verify_input = torch.cat([
@@ -335,11 +338,12 @@ async def health():
 
 
 @web_app.get("/generate")
-async def generate(prompt: str, max_new_tokens: int = 64, mode: str = "medusa", acceptance: str = "typical"):
+async def generate(prompt: str, max_new_tokens: int = 64, mode: str = "medusa", acceptance: str = "typical", tree_budget: int = 64):
     max_new_tokens = max(4, min(int(max_new_tokens), MAX_TOKENS_CAP))
+    tree_budget = max(1, min(int(tree_budget), 512))
 
     def stream():
-        for event in _run_inference(prompt, max_new_tokens, mode, acceptance, device="cuda"):
+        for event in _run_inference(prompt, max_new_tokens, mode, acceptance, device="cuda", tree_budget=tree_budget):
             yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(
@@ -352,13 +356,14 @@ async def generate(prompt: str, max_new_tokens: int = 64, mode: str = "medusa", 
 # ── Modal endpoint ─────────────────────────────────────────────────────────────
 
 @app.function(
+    min_containers=2,
     image=_image,
     gpu="T4",
     volumes={"/hf-cache": _volume},
     scaledown_window=300,
     timeout=300,
-    allow_concurrent_inputs=4,
 )
+@modal.concurrent(max_inputs=1)
 @modal.asgi_app()
 def serve():
     """Called once per container start; loads model then returns the FastAPI app."""

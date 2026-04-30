@@ -54,7 +54,8 @@ const INITIAL_STATE: StreamState = {
 
 export default function LiveDemoSection() {
   const [prompt, setPrompt] = useState(EXAMPLE_PROMPTS[0])
-  const [maxTokens, setMaxTokens] = useState(64)
+  const [maxTokens, setMaxTokens] = useState(128)
+  const [treeBudget, setTreeBudget] = useState(64)
   const [mode, setMode] = useState<'base' | 'medusa' | 'compare'>('compare')
   
   const [medusa, setMedusa] = useState<StreamState>(INITIAL_STATE)
@@ -64,6 +65,15 @@ export default function LiveDemoSection() {
   const baseEsRef = useRef<EventSource | null>(null)
   const medusaGotDataRef = useRef(false)
   const baseGotDataRef = useRef(false)
+
+  useEffect(() => {
+    // Pre-warm the backend by hitting the health endpoint.
+    // With min_containers=2 and max_inputs=1 on Modal, hitting this
+    // helps ensure at least one (and ideally two) instances are ready.
+    if (PRIMARY_URL) {
+      fetch(`${PRIMARY_URL}/`).catch(() => {});
+    }
+  }, [])
 
   useEffect(() => () => { 
     medusaEsRef.current?.close()
@@ -75,6 +85,7 @@ export default function LiveDemoSection() {
     isFallback: boolean,
     p: string,
     tokens: number,
+    budget: number,
     inferenceMode: 'base' | 'medusa',
     updateState: React.Dispatch<React.SetStateAction<StreamState>>,
     esRef: React.MutableRefObject<EventSource | null>,
@@ -86,6 +97,7 @@ export default function LiveDemoSection() {
     const params = new URLSearchParams({
       prompt: p,
       max_new_tokens: String(tokens),
+      tree_budget: String(budget),
       mode: inferenceMode,
     })
     const es = new EventSource(`${baseUrl}/generate?${params}`)
@@ -125,7 +137,7 @@ export default function LiveDemoSection() {
     es.onerror = () => {
       es.close()
       if (!gotDataRef.current && !isFallback && FALLBACK_URL) {
-        openStream(FALLBACK_URL, true, p, tokens, inferenceMode, updateState, esRef, gotDataRef)
+        openStream(FALLBACK_URL, true, p, tokens, budget, inferenceMode, updateState, esRef, gotDataRef)
       } else if (!gotDataRef.current) {
         updateState(prev => ({
           ...prev,
@@ -143,14 +155,14 @@ export default function LiveDemoSection() {
     
     if (mode === 'medusa' || mode === 'compare') {
       setMedusa({ ...INITIAL_STATE, isStreaming: true, status: 'queued' })
-      openStream(PRIMARY_URL, false, prompt, maxTokens, 'medusa', setMedusa, medusaEsRef, medusaGotDataRef)
+      openStream(PRIMARY_URL, false, prompt, maxTokens, treeBudget, 'medusa', setMedusa, medusaEsRef, medusaGotDataRef)
     } else {
       setMedusa(INITIAL_STATE)
     }
 
     if (mode === 'base' || mode === 'compare') {
       setBase({ ...INITIAL_STATE, isStreaming: true, status: 'queued' })
-      openStream(PRIMARY_URL, false, prompt, maxTokens, 'base', setBase, baseEsRef, baseGotDataRef)
+      openStream(PRIMARY_URL, false, prompt, maxTokens, treeBudget, 'base', setBase, baseEsRef, baseGotDataRef)
     } else {
       setBase(INITIAL_STATE)
     }
@@ -253,13 +265,28 @@ export default function LiveDemoSection() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Length</span>
-              {BUDGETS.map((b) => (
+              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Sequence</span>
+              {[64, 128, 256, 512].map((b) => (
                 <button
                   key={b}
                   onClick={() => setMaxTokens(b)}
                   className={`px-2 py-1 rounded text-[10px] font-mono border transition-colors ${
                     maxTokens === b ? 'bg-ink text-white border-ink' : 'border-birch text-ink-soft hover:border-ink-soft'
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Tree Budget</span>
+              {BUDGETS.map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setTreeBudget(b)}
+                  className={`px-2 py-1 rounded text-[10px] font-mono border transition-colors ${
+                    treeBudget === b ? 'bg-grove text-white border-grove' : 'border-birch text-ink-soft hover:border-ink-soft'
                   }`}
                 >
                   {b}
