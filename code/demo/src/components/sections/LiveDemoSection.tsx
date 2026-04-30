@@ -163,10 +163,10 @@ export default function LiveDemoSection() {
     setBase(INITIAL_STATE)
   }
 
-  const renderStreamBox = (state: StreamState, title: string, subtitle: string, accentColor: string) => {
+  const renderStreamBox = (state: StreamState, title: string, subtitle: string, accentColor: string, defaultRate = 0) => {
     const lastStep = state.steps[state.steps.length - 1]
     const liveTps = state.done?.tps ?? lastStep?.tps ?? 0
-    const liveRate = state.done?.avg_acceptance ?? lastStep?.avg_rate ?? 0
+    const liveRate = (state.done?.avg_acceptance || lastStep?.avg_rate) ?? defaultRate
     const liveTotal = state.done?.total_tokens ?? lastStep?.total ?? 0
 
     return (
@@ -247,7 +247,7 @@ export default function LiveDemoSection() {
                     mode === m ? 'bg-grove text-white border-grove shadow-sm' : 'border-birch text-ink-soft hover:border-ink-soft'
                   }`}
                 >
-                  {m === 'base' ? 'No Extra Head' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
+                  {m === 'base' ? 'Base (1 Head)' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
                 </button>
               ))}
             </div>
@@ -282,7 +282,7 @@ export default function LiveDemoSection() {
 
         {/* Output Area */}
         <div className="flex flex-wrap gap-6 items-stretch">
-          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base Model", "Standard 1-token-at-a-time", "blue-600")}
+          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base (1 LM Head)", "Standard 1-token-at-a-time", "blue-600", 1)}
           {(mode === 'medusa' || mode === 'compare') && renderStreamBox(medusa, "Medusa Head", "Speculative multiple tokens", "grove")}
         </div>
 
