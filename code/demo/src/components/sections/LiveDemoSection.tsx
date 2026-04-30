@@ -52,11 +52,97 @@ const INITIAL_STATE: StreamState = {
   status: 'idle'
 }
 
+function StreamBox({ state, title, subtitle, accentColor }: { state: StreamState, title: string, subtitle: string, accentColor: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
+  
+  useEffect(() => {
+    if (scrollRef.current && state.isStreaming) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [state.steps, state.isStreaming])
+
+  const lastStep = state.steps[state.steps.length - 1]
+  const liveTps = state.done?.tps ?? lastStep?.tps ?? 0
+  const liveTotal = state.done?.total_tokens ?? lastStep?.total ?? 0
+  
+  // Find the last non-zero rate recorded during the run
+  const lastNonZeroRate = [...state.steps].reverse().find(s => s.avg_rate > 0)?.avg_rate ?? 0
+  
+  const rawRate = state.done?.avg_acceptance ?? lastStep?.avg_rate ?? 0
+  const liveRate = rawRate > 0 ? rawRate : lastNonZeroRate
+
+  const handleCopy = () => {
+    const text = state.steps.map(s => s.tokens.map(t => t.text).join('')).join('')
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className={`flex-1 min-w-[300px] bg-white border ${state.status === 'generating' ? `border-${accentColor}` : 'border-birch'} rounded-lg p-5 flex flex-col gap-3 transition-colors duration-500 shadow-sm relative group`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className={`text-xs font-mono font-bold uppercase tracking-wider text-${accentColor}`}>{title}</h3>
+          <p className="text-[10px] text-ink-soft font-mono">{subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {state.status === 'done' && (
+            <button 
+              onClick={handleCopy}
+              className="text-[10px] font-mono text-ink-soft hover:text-grove transition-colors flex items-center gap-1"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
+          {state.backendLabel && (
+            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+              state.backendLabel === 'GPU' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {state.backendLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div 
+        ref={scrollRef}
+        className="flex-1 min-h-48 max-h-[400px] p-3 bg-parchment/30 rounded border border-birch/50 overflow-auto scroll-smooth"
+      >
+        {state.status === 'queued' && <p className="text-xs font-mono text-ink-soft animate-pulse">Connecting to inference server...</p>}
+        {state.status === 'idle' && <p className="text-xs font-mono text-birch/60 italic">Ready for generation</p>}
+        <TokenStreamViz steps={state.steps} isStreaming={state.isStreaming} />
+        {state.error && <p className="mt-2 text-[10px] text-red-600 font-mono bg-red-50 p-2 rounded border border-red-100">{state.error}</p>}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-birch/30">
+        <div className="text-center" title="Total tokens generated">
+          <div className={`text-sm font-bold font-mono text-${accentColor}`}>{liveTotal}</div>
+          <div className="text-[9px] text-ink-soft uppercase">Tokens</div>
+        </div>
+        <div className="text-center" title="Average tokens verified per model pass">
+          <div className={`text-sm font-bold font-mono text-${accentColor}`}>{liveRate.toFixed(1)}</div>
+          <div className="text-[9px] text-ink-soft uppercase">Tok/Pass</div>
+        </div>
+        <div className="text-center" title="Tokens per second (throughput)">
+          <div className={`text-sm font-bold font-mono text-${accentColor}`}>{liveTps.toFixed(1)}</div>
+          <div className="text-[9px] text-ink-soft uppercase">TPS</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LiveDemoSection() {
   const [prompt, setPrompt] = useState(EXAMPLE_PROMPTS[0])
   const [maxTokens, setMaxTokens] = useState(128)
   const [treeBudget, setTreeBudget] = useState(64)
-  const [mode, setMode] = useState<'base' | 'medusa' | 'compare'>('compare')
+  const [mode, setMode] = useState<'base' | 'medusa' | 'compare'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'medusa'
+    }
+    return 'compare'
+  })
   
   const [medusa, setMedusa] = useState<StreamState>(INITIAL_STATE)
   const [base, setBase] = useState<StreamState>(INITIAL_STATE)
@@ -68,8 +154,6 @@ export default function LiveDemoSection() {
 
   useEffect(() => {
     // Pre-warm the backend by hitting the health endpoint.
-    // With min_containers=2 and max_inputs=1 on Modal, hitting this
-    // helps ensure at least one (and ideally two) instances are ready.
     if (PRIMARY_URL) {
       fetch(`${PRIMARY_URL}/`).catch(() => {});
     }
@@ -150,6 +234,7 @@ export default function LiveDemoSection() {
   }
 
   const handleGenerate = () => {
+    if (!prompt.trim()) return
     medusaEsRef.current?.close()
     baseEsRef.current?.close()
     
@@ -238,70 +323,94 @@ export default function LiveDemoSection() {
         </div>
 
         {/* Controls */}
-        <div className="bg-white border border-birch rounded-lg p-5 flex flex-col gap-4">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            maxLength={300}
-            rows={2}
-            className="w-full resize-none border border-birch rounded p-3 text-sm font-sans text-ink bg-parchment focus:outline-none focus:border-grove"
-            placeholder="Enter a prompt…"
-          />
-
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Mode</span>
-              {(['base', 'medusa', 'compare'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`px-3 py-1 rounded text-xs font-mono border transition-all ${
-                    mode === m ? 'bg-grove text-white border-grove shadow-sm' : 'border-birch text-ink-soft hover:border-ink-soft'
-                  }`}
+        <div className="bg-white border border-birch rounded-lg p-5 flex flex-col gap-5 shadow-sm">
+          <div className="flex flex-col gap-2">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  handleGenerate()
+                }
+              }}
+              maxLength={300}
+              rows={3}
+              className="w-full resize-none border border-birch rounded p-4 text-sm font-sans text-ink bg-parchment focus:outline-none focus:border-grove transition-colors"
+              placeholder="Enter a prompt…"
+            />
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLE_PROMPTS.map(p => (
+                <button 
+                  key={p} 
+                  onClick={() => setPrompt(p)}
+                  className="text-[10px] font-mono px-2 py-1 rounded bg-birch/10 text-ink-soft hover:bg-birch/20 hover:text-ink transition-colors"
                 >
-                  {m === 'base' ? 'Base (1 Head)' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
+                  {p.length > 35 ? p.slice(0, 35) + '...' : p}
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-birch/30">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Mode</span>
+              <div className="flex bg-parchment p-0.5 rounded border border-birch">
+                {(['base', 'medusa', 'compare'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`px-3 py-1 rounded text-[10px] font-mono transition-all ${
+                      mode === m ? 'bg-grove text-white shadow-sm' : 'text-ink-soft hover:text-ink'
+                    }`}
+                  >
+                    {m === 'base' ? 'No Extra Head' : m === 'medusa' ? 'Head (Medusa)' : 'Compare Both'}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Sequence</span>
-              {[64, 128, 256, 512].map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setMaxTokens(b)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono border transition-colors ${
-                    maxTokens === b ? 'bg-ink text-white border-ink' : 'border-birch text-ink-soft hover:border-ink-soft'
-                  }`}
-                >
-                  {b}
-                </button>
-              ))}
+              <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Length</span>
+              <div className="flex bg-parchment p-0.5 rounded border border-birch">
+                {[64, 128, 256, 512].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setMaxTokens(b)}
+                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                      maxTokens === b ? 'bg-ink text-white' : 'text-ink-soft hover:text-ink'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-mono text-ink-soft uppercase tracking-wider">Tree Budget</span>
-              {BUDGETS.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setTreeBudget(b)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono border transition-colors ${
-                    treeBudget === b ? 'bg-grove text-white border-grove' : 'border-birch text-ink-soft hover:border-ink-soft'
-                  }`}
-                >
-                  {b}
-                </button>
-              ))}
+              <div className="flex bg-parchment p-0.5 rounded border border-birch">
+                {BUDGETS.map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setTreeBudget(b)}
+                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                      treeBudget === b ? 'bg-grove text-white' : 'text-ink-soft hover:text-ink'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex items-center gap-3 ml-auto">
-              <button onClick={handleReset} className="text-xs font-mono text-ink-soft hover:text-ink transition-colors">Reset</button>
+            <div className="flex items-center gap-4 ml-auto">
+              <button onClick={handleReset} className="text-[11px] font-mono text-ink-soft hover:text-ink transition-colors uppercase tracking-wider">Reset</button>
               <button
                 onClick={handleGenerate}
                 disabled={medusa.isStreaming || base.isStreaming || !prompt.trim()}
-                className="px-5 py-2 rounded bg-grove text-white text-xs font-mono tracking-wide disabled:opacity-40 hover:opacity-80 transition-all shadow-md active:scale-95"
+                className="px-6 py-2 rounded bg-grove text-white text-xs font-mono tracking-widest uppercase disabled:opacity-40 hover:opacity-90 transition-all shadow-md active:scale-95"
               >
-                {medusa.isStreaming || base.isStreaming ? 'Running Inference...' : 'Generate →'}
+                {medusa.isStreaming || base.isStreaming ? 'Running...' : 'Generate →'}
               </button>
             </div>
           </div>
@@ -309,7 +418,7 @@ export default function LiveDemoSection() {
 
         {/* Output Area */}
         <div className="flex flex-wrap gap-6 items-stretch">
-          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base (1 LM Head)", "Standard 1-token-at-a-time", "blue-600", 1)}
+          {(mode === 'base' || mode === 'compare') && renderStreamBox(base, "Base Model", "Standard 1-token-at-a-time", "blue-600")}
           {(mode === 'medusa' || mode === 'compare') && renderStreamBox(medusa, "Medusa Head", "Speculative multiple tokens", "grove")}
         </div>
 
