@@ -51,8 +51,23 @@ export default function HeroSection() {
           <AutoregressiveViz active={inView} />
         </motion.div>
 
-        <motion.div variants={fadeUp} className="text-center text-ink-soft text-sm">
-          Scroll down to see exactly how this works →
+        <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a
+            href="#live-demo"
+            onClick={(e) => {
+              e.preventDefault()
+              document.getElementById('live-demo')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+            className="px-6 py-2.5 rounded bg-grove text-white text-sm font-mono tracking-wide hover:opacity-80 transition-opacity"
+          >
+            Try it yourself →
+          </a>
+          <a
+            href="/how-it-works"
+            className="text-sm font-mono text-ink-soft hover:text-ink transition-colors"
+          >
+            How it works ↓
+          </a>
         </motion.div>
       </motion.div>
     </section>
